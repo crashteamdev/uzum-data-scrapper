@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: '@project.name@'
+  redis:
+    host: 0.0.0.0
+    port: 55000
+    password: redispw
+  quartz:
+    properties:
+      org:
+        quartz:
+          threadPool:
+            threadCount: 30
+            class: org.quartz.simpl.SimpleThreadPool
+          jobStore:
+            misfireThreshold: 60000
+            class: org.quartz.simpl.RAMJobStore
+#            class: net.joelinn.quartz.jobstore.RedisJobStore
+#            host: 0.0.0.0
+#            port: 55000
+#            password: redispw
+#            ssl: true
+app:
+  job:
+    cron:
+      position-product-job: 0 0 0,21 ? * * *
+      product-job: 0 0 0,21 ? * * *
+      position-job: 0 0 4 ? * * *
+      category-job: 0 0 1 ? * * *
+      trim-job: 0 0/60 * * * ?
+  stream:
+    product:
+      key: uzum-product-stream
+      group: uzum-product-group
+      maxlen: 50000
+      waitPending: 0
+    position:
+      key: uzum-position-stream
+      group: uzum-position-group
+      maxlen: 50000
+      waitPending: 0
+    category:
+      key: uzum-category-stream
+      group: uzum-category-group
+      maxlen: 50000
+      waitPending: 0
+  integration:
+    timeout: 600
+    uzum:
+      token:
+    styx:
+
+loki:
+  host: localhost
+  enabled: false
