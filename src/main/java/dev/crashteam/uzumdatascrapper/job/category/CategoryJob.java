@@ -19,10 +19,10 @@ import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.retry.RetryCallback;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.util.CollectionUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -47,21 +47,29 @@ public class CategoryJob implements Job {
     @Override
     @SneakyThrows
     public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
-        UzumCategory.Data data = retryTemplate.execute((RetryCallback<UzumCategory.Data, CategoryRequestException>) retryContext -> {
-            var categoryData = uzumService.getCategoryData(1L);
-            if (categoryData.getPayload() == null || !CollectionUtils.isEmpty(categoryData.getErrors())) {
+        List<UzumCategory.Data> data = retryTemplate.execute((RetryCallback<List<UzumCategory.Data>, CategoryRequestException>) retryContext -> {
+            var categoryData = uzumService.getRootCategories();
+            if (categoryData == null) {
                 throw new CategoryRequestException();
             }
-            return categoryData.getPayload().getCategory();
+            return categoryData;
         });
-        for (UzumCategory.Data dataChild : data.getChildren()) {
-            UzumCategoryMessage categoryMessage = UzumCategoryToMessageMapper.categoryToMessage(dataChild);
-            RecordId recordId = streamCommands.xAdd(streamKey.getBytes(StandardCharsets.UTF_8),
-                    Collections.singletonMap("category".getBytes(StandardCharsets.UTF_8),
-                            objectMapper.writeValueAsBytes(categoryMessage)));
-            log.info("Posted [stream={}] category record with id - [{}]",
-                    streamKey, recordId);
+        for (UzumCategory.Data dataChild : data) {
+            postCategoryRecord(dataChild);
         }
 
+    }
+
+    @SneakyThrows
+    private void postCategoryRecord(UzumCategory.Data data) {
+        UzumCategoryMessage categoryMessage = UzumCategoryToMessageMapper.categoryToMessage(data);
+        RecordId recordId = streamCommands.xAdd(streamKey.getBytes(StandardCharsets.UTF_8),
+                Collections.singletonMap("category".getBytes(StandardCharsets.UTF_8),
+                        objectMapper.writeValueAsBytes(categoryMessage)));
+        log.info("Posted [stream={}] category record with id - [{}]",
+                streamKey, recordId);
+        for (UzumCategory.Data child : data.getChildren()) {
+            postCategoryRecord(child);
+        }
     }
 }
