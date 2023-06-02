@@ -21,8 +21,12 @@ public class SimpleTriggerJobCreatorService {
     private final Scheduler scheduler;
 
     public void createJob(String jobName, String idKey, Class<? extends Job> jobClass, boolean allIds) {
-
-        Set<Long> ids = uzumService.getIds(allIds);
+        Set<Long> ids;
+        if (!allIds) {
+            ids = uzumService.getIds(false);
+        } else {
+            ids = uzumService.getIdsByGql();
+        }
         for (Long categoryId : ids) {
             String name = jobName.formatted(categoryId);
             JobKey jobKey = new JobKey(name);

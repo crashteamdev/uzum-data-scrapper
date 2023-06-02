@@ -2,6 +2,7 @@ package dev.crashteam.uzumdatascrapper.service.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.crashteam.uzumdatascrapper.exception.CategoryRequestException;
+import dev.crashteam.uzumdatascrapper.exception.UzumGqlRequestException;
 import dev.crashteam.uzumdatascrapper.model.ProxyRequestParams;
 import dev.crashteam.uzumdatascrapper.model.StyxProxyResult;
 import dev.crashteam.uzumdatascrapper.model.uzum.*;
@@ -12,14 +13,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
+import org.springframework.retry.RetryCallback;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -28,6 +33,7 @@ public class UzumService {
 
     private final StyxProxyService proxyService;
     private final ThreadPoolTaskExecutor taskExecutor;
+    private final RetryTemplate retryTemplate;
 
     @Value("${app.integration.uzum.token}")
     private String authToken;
@@ -130,30 +136,6 @@ public class UzumService {
         return ids;
     }
 
-    private void extractALlIds(UzumCategory.Data data, Set<Long> ids) {
-        ids.add(data.getId());
-        extractAllIds(data, ids);
-    }
-
-    private void extractIds(UzumCategory.Data data, Set<Long> ids) {
-        ids.add(data.getId());
-        for (UzumCategory.Data child : data.getChildren()) {
-            ids.add(child.getId());
-        }
-    }
-
-
-    private Callable<Void> extractIdsAsync(UzumCategory.Data data, Set<Long> ids, boolean all) {
-        return () -> {
-            if (all) {
-                extractAllIds(data, ids);
-            } else {
-                extractIds(data, ids);
-            }
-            return null;
-        };
-    }
-
     @SneakyThrows
     public UzumGQLResponse getGQLSearchResponse(String categoryId, long offset, long limit) {
         log.info("Starting gql catalog search with values: [categoryId - {}] , [offset - {}], [limit - {}]"
@@ -198,6 +180,76 @@ public class UzumService {
         return proxyService
                 .getProxyResult(requestParams, new ParameterizedTypeReference<StyxProxyResult<UzumGQLResponse>>() {
                 }).getBody();
+    }
+
+    public Set<Long> getIdsByGql() {
+        Set<Long> ids = getIds(false);
+        Set<Long> categoryIds = new CopyOnWriteArraySet<>();
+        List<Callable<Void>> callables = new ArrayList<>();
+        for (Long id : ids) {
+            callables.add(processGqlForIds(id, categoryIds));
+        }
+        List<Future<Void>> futures = callables.stream()
+                .map(taskExecutor::submit)
+                .toList();
+        for (Future<Void> future : futures) {
+            try {
+                future.get();
+            } catch (Exception e) {
+                log.error("Multithreading error", e);
+            }
+        }
+        log.info("Collected {} ids from GQL requests", categoryIds.size());
+        return categoryIds;
+    }
+
+    private Callable<Void> processGqlForIds(Long id, Set<Long> ids) {
+        return () -> {
+            UzumGQLResponse gqlResponse = retryTemplate.execute((RetryCallback<UzumGQLResponse, UzumGqlRequestException>) retryContext -> {
+                UzumGQLResponse response = getGQLSearchResponse(String.valueOf(id), 0, 0);
+                if (!CollectionUtils.isEmpty(response.getErrors())) {
+                    for (UzumGQLResponse.GQLError error : response.getErrors()) {
+                        if (error.getMessage().contains("offset")) {
+                            log.warn("Finished collecting data for id - {}, " +
+                                    "because of response error object with message - {}", id, error.getMessage());
+                            return null;
+                        } else if (error.getMessage().contains("429")) {
+                            log.warn("Got 429 http status from request for category id {}", id);
+                            throw new UzumGqlRequestException("Request ended with error message - %s".formatted(error.getMessage()));
+                        }
+                    }
+                }
+                return response;
+            });
+            for (UzumGQLResponse.ResponseCategoryWrapper categoryWrapper : gqlResponse.getData().getMakeSearch().getCategoryTree()) {
+                ids.add(categoryWrapper.getCategory().getId());
+            }
+            return null;
+        };
+    }
+
+    private void extractALlIds(UzumCategory.Data data, Set<Long> ids) {
+        ids.add(data.getId());
+        extractAllIds(data, ids);
+    }
+
+    private void extractIds(UzumCategory.Data data, Set<Long> ids) {
+        ids.add(data.getId());
+        for (UzumCategory.Data child : data.getChildren()) {
+            ids.add(child.getId());
+        }
+    }
+
+
+    private Callable<Void> extractIdsAsync(UzumCategory.Data data, Set<Long> ids, boolean all) {
+        return () -> {
+            if (all) {
+                extractAllIds(data, ids);
+            } else {
+                extractIds(data, ids);
+            }
+            return null;
+        };
     }
 
     private void extractAllIds(UzumCategory.Data data, Set<Long> ids) {

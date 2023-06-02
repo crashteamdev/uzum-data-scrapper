@@ -75,7 +75,7 @@ public class ProductJob implements Job {
         log.info("Starting job with category id - {}", categoryId);
         AtomicLong offset = (AtomicLong) jobDetail.getJobDataMap().get("offset");
         AtomicLong totalItemProcessed = (AtomicLong) jobDetail.getJobDataMap().get("totalItemProcessed");
-        long limit = 60;
+        long limit = 100;
         try {
             while (true) {
                 try {

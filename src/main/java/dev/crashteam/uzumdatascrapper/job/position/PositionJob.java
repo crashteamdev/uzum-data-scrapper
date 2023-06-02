@@ -70,7 +70,7 @@ public class PositionJob implements Job {
         log.info("Starting position job with category id - {}", categoryId);
         AtomicLong offset = (AtomicLong) jobDetail.getJobDataMap().get("offset");
         AtomicLong totalItemProcessed = (AtomicLong) jobDetail.getJobDataMap().get("totalItemProcessed");
-        long limit = 60;
+        long limit = 100;
         AtomicLong position = new AtomicLong(0);
         try {
             while (true) {
