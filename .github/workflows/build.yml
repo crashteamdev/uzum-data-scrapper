@@ -1,0 +1,40 @@
+name: Maven Build Artifact
+
+on:
+  pull_request:
+    branches:
+      - '*'
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: 17
+          distribution: temurin
+          cache: 'maven'
+
+      - shell: bash
+        run: |
+          mvn -B clean compile package
+  test-coverage:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+      - name: set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: 17
+          distribution: temurin
+          cache: 'maven'
+      - shell: bash
+        run: |
+          mvn -B clean compile package
+      - name: Upload code coverage
+        uses: codecov/codecov-action@v3
