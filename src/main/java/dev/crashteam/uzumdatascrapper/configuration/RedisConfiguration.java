@@ -23,7 +23,7 @@ public class RedisConfiguration {
     @Bean
     public LettuceConnectionFactory lettuceConnectionFactory() {
         LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
-                .useSsl().build();
+                .useSsl().disablePeerVerification().build();
         RedisStandaloneConfiguration redisStandaloneConfig = new RedisStandaloneConfiguration();
         redisStandaloneConfig.setUsername("default");
         redisStandaloneConfig.setHostName(redisHost);

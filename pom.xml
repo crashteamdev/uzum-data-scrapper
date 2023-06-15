@@ -5,7 +5,7 @@
     <parent>
         <groupId>dev.crashteam</groupId>
         <artifactId>service-parent-pom</artifactId>
-        <version>1.0.6</version>
+        <version>1.0.7</version>
     </parent>
     <groupId>dev.crashteam</groupId>
     <artifactId>uzum-data-scrapper</artifactId>

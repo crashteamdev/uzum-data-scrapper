@@ -49,7 +49,3 @@ app:
     uzum:
       token:
     styx:
-
-loki:
-  host: localhost
-  enabled: false
