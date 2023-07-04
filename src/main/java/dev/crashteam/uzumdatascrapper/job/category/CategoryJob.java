@@ -70,28 +70,5 @@ public class CategoryJob implements Job {
                         objectMapper.writeValueAsBytes(categoryMessage)));
         log.info("Posted [stream={}] category record with id - [{}]",
                 streamKey, recordId);
-        for (UzumCategory.Data category : childCategory.getChildren()) {
-            if (!CollectionUtils.isEmpty(category.getChildren())) {
-                postCategoryRecord(category);
-            } else {
-                UzumGQLResponse categories = uzumService.retryableGQLRequest(category.getId(), 0, 0);
-                categories.getData().getMakeSearch().getCategoryTree()
-                        .stream()
-                        .filter(it -> it.getCategory().getParent().getId() == category.getId())
-                        .forEach(it -> {
-                            try {
-                                UzumCategoryMessage categoryGqlMessage = UzumCategoryToMessageMapper
-                                        .categoryToMessage(it.getCategory(), category.isEco());
-                                RecordId recordGqlId = streamCommands.xAdd(streamKey.getBytes(StandardCharsets.UTF_8),
-                                        Collections.singletonMap("category".getBytes(StandardCharsets.UTF_8),
-                                                objectMapper.writeValueAsBytes(categoryGqlMessage)));
-                                log.info("Posted [stream={}] category record with id - [{}]",
-                                        streamKey, recordGqlId);
-                            } catch (Exception e) {
-                                log.error("GQL categories exception - ", e);
-                            }
-                        });
-            }
-        }
     }
 }
