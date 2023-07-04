@@ -24,7 +24,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -117,26 +116,6 @@ public class UzumService {
     }
 
     @SneakyThrows
-    public Set<Long> getIdsByMainCategory(boolean all) {
-        log.info("Collecting category id's...");
-        Set<Long> ids = new HashSet<>();
-        UzumCategoryChild categoryData = getCategoryData(1L);
-        if (categoryData.getPayload() != null && categoryData.getPayload().getCategory() != null) {
-            for (UzumCategory.Data category : categoryData.getPayload().getCategory().getChildren()) {
-                if (all) {
-                    extractAllIds(category, ids);
-                } else {
-                    extractIds(category, ids);
-                }
-            }
-        } else {
-            throw new CategoryRequestException("Id collecting failed");
-        }
-        log.info("Collected id's size - {}", ids.size());
-        return ids;
-    }
-
-    @SneakyThrows
     public UzumGQLResponse getGQLSearchResponse(String categoryId, long offset, long limit) {
         log.info("Starting gql catalog search with values: [categoryId - {}] , [offset - {}], [limit - {}]"
                 , categoryId, offset, limit);
@@ -203,34 +182,33 @@ public class UzumService {
         return categoryIds;
     }
 
-    private Callable<Void> processGqlForIds(Long id, Set<Long> ids) {
-        return () -> {
-            UzumGQLResponse gqlResponse = retryTemplate.execute((RetryCallback<UzumGQLResponse, UzumGqlRequestException>) retryContext -> {
-                UzumGQLResponse response = getGQLSearchResponse(String.valueOf(id), 0, 0);
-                if (!CollectionUtils.isEmpty(response.getErrors())) {
-                    for (UzumGQLResponse.GQLError error : response.getErrors()) {
-                        if (error.getMessage().contains("offset")) {
-                            log.warn("Finished collecting data for id - {}, " +
-                                    "because of response error object with message - {}", id, error.getMessage());
-                            return null;
-                        } else if (error.getMessage().contains("429")) {
-                            log.warn("Got 429 http status from request for category id {}", id);
-                            throw new UzumGqlRequestException("Request ended with error message - %s".formatted(error.getMessage()));
-                        }
+    public UzumGQLResponse retryableGQLRequest(long categoryId, long offset, long limit) {
+        return retryTemplate.execute((RetryCallback<UzumGQLResponse, UzumGqlRequestException>) retryContext -> {
+            UzumGQLResponse response = getGQLSearchResponse(String.valueOf(categoryId), offset, limit);
+            if (!CollectionUtils.isEmpty(response.getErrors())) {
+                for (UzumGQLResponse.GQLError error : response.getErrors()) {
+                    if (error.getMessage().contains("offset")) {
+                        log.warn("Finished collecting data for id - {}, " +
+                                "because of response error object with message - {}", categoryId, error.getMessage());
+                        return null;
+                    } else if (error.getMessage().contains("429")) {
+                        log.warn("Got 429 http status from request for category id {}", categoryId);
+                        throw new UzumGqlRequestException("Request ended with error message - %s".formatted(error.getMessage()));
                     }
                 }
-                return response;
-            });
+            }
+            return response;
+        });
+    }
+
+    private Callable<Void> processGqlForIds(Long id, Set<Long> ids) {
+        return () -> {
+            UzumGQLResponse gqlResponse = retryableGQLRequest(id, 0L, 0L);
             for (UzumGQLResponse.ResponseCategoryWrapper categoryWrapper : gqlResponse.getData().getMakeSearch().getCategoryTree()) {
                 ids.add(categoryWrapper.getCategory().getId());
             }
             return null;
         };
-    }
-
-    private void extractALlIds(UzumCategory.Data data, Set<Long> ids) {
-        ids.add(data.getId());
-        extractAllIds(data, ids);
     }
 
     private void extractIds(UzumCategory.Data data, Set<Long> ids) {

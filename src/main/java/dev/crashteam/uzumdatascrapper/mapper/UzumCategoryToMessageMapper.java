@@ -2,6 +2,7 @@ package dev.crashteam.uzumdatascrapper.mapper;
 
 import dev.crashteam.uzumdatascrapper.model.dto.UzumCategoryMessage;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumCategory;
+import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLResponse;
 import org.springframework.util.CollectionUtils;
 
 import java.time.Instant;
@@ -25,6 +26,18 @@ public class UzumCategoryToMessageMapper {
             }
             categoryMessage.setChildren(childrenCategories);
         }
+        return categoryMessage;
+    }
+
+    public static UzumCategoryMessage categoryToMessage(UzumGQLResponse.ResponseCategory category, boolean eco) {
+        UzumCategoryMessage categoryMessage = UzumCategoryMessage.builder()
+                .id(category.getId())
+                .adult(category.isAdult())
+                .title(category.getTitle())
+                .eco(eco)
+                .time(Instant.now().toEpochMilli())
+                .build();
+
         return categoryMessage;
     }
 }
