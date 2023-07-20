@@ -68,13 +68,7 @@ public class CategoryJob implements Job {
             for (UzumCategory.Data rootCategory : rootCategories) {
                 callables.add(postCategoryRecord(rootCategory, categoryTree));
             }
-            jobExecutor.invokeAll(callables).forEach(it -> {
-                try {
-                    it.get();
-                } catch (Exception e) {
-                    log.error("ERROR - ", e);
-                }
-            });
+            jobExecutor.invokeAll(callables);
         } finally {
             jobExecutor.shutdown();
         }
