@@ -23,12 +23,11 @@ import org.springframework.util.CollectionUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -64,30 +63,33 @@ public class CategoryJob implements Job {
                 return categoryData;
             });
             List<Callable<Void>> callables = new ArrayList<>();
+            UzumGQLResponse gqlResponse = uzumService.retryableGQLRequest(1, 0, 0);
+            List<UzumGQLResponse.ResponseCategoryWrapper> categoryTree = gqlResponse.getData().getMakeSearch().getCategoryTree();
             for (UzumCategory.Data rootCategory : rootCategories) {
-                callables.add(postCategoryRecord(rootCategory));
+                callables.add(postCategoryRecord(rootCategory, categoryTree));
             }
             jobExecutor.invokeAll(callables);
         } finally {
             jobExecutor.shutdown();
         }
+        log.info("Finished category job");
 
     }
 
     @SneakyThrows
-    private Callable<Void> postCategoryRecord(UzumCategory.Data rootCategory) {
+    private Callable<Void> postCategoryRecord(UzumCategory.Data rootCategory, List<UzumGQLResponse.ResponseCategoryWrapper> categoryTree) {
         return () -> {
-            UzumCategoryMessage categoryMessage = categoryToMessage(rootCategory);
+            UzumCategoryMessage categoryMessage = categoryToMessage(rootCategory, categoryTree);
             RecordId recordId = streamCommands.xAdd(streamKey.getBytes(StandardCharsets.UTF_8),
                     Collections.singletonMap("category".getBytes(StandardCharsets.UTF_8),
                             objectMapper.writeValueAsBytes(categoryMessage)));
-            log.info("Posted [stream={}] category record with id - [{}]",
-                    streamKey, recordId);
+            log.info("Posted [stream={}] category record with record_id - [{}] and category_id - [{}]",
+                    streamKey, recordId, rootCategory.getId());
             return null;
         };
     }
 
-    private UzumCategoryMessage categoryToMessage(UzumCategory.Data category) {
+    private UzumCategoryMessage categoryToMessage(UzumCategory.Data category, List<UzumGQLResponse.ResponseCategoryWrapper> categoryTree) {
         UzumCategoryMessage categoryMessage = UzumCategoryMessage.builder()
                 .id(category.getId())
                 .adult(category.isAdult())
@@ -95,32 +97,59 @@ public class CategoryJob implements Job {
                 .title(category.getTitle())
                 .time(Instant.now().toEpochMilli())
                 .build();
+
         if (!CollectionUtils.isEmpty(category.getChildren())) {
             List<UzumCategoryMessage> childrenCategories = new ArrayList<>();
             for (UzumCategory.Data child : category.getChildren()) {
-                childrenCategories.add(categoryToMessage(child));
+                childrenCategories.add(categoryToMessage(child, categoryTree));
             }
             categoryMessage.setChildren(childrenCategories);
         } else {
-            List<UzumCategoryMessage> childrenCategories = new ArrayList<>();
-            UzumGQLResponse categories = uzumService.retryableGQLRequest(category.getId(), 0, 0);
-            categories.getData().getMakeSearch().getCategoryTree()
-                    .stream()
-                    .filter(it -> it.getCategory().getParent() != null)
-                    .filter(it -> it.getCategory().getParent().getId() == category.getId())
-                    .forEach(it -> {
-                        UzumGQLResponse.ResponseCategory responseCategory = it.getCategory();
-                        UzumCategoryMessage childCategoryMessage = UzumCategoryMessage.builder()
-                                .id(responseCategory.getId())
-                                .adult(responseCategory.isAdult())
-                                .eco(category.isEco())
-                                .title(responseCategory.getTitle())
-                                .time(Instant.now().toEpochMilli())
-                                .build();
-                        childrenCategories.add(childCategoryMessage);
-                    });
-            categoryMessage.setChildren(childrenCategories);
+            if (hasChildren(category.getId(), categoryTree)) {
+                List<UzumCategoryMessage> childrenCategories = new ArrayList<>();
+                Set<UzumGQLResponse.ResponseCategoryWrapper> responseCategories = categoryTree.stream()
+                        .filter(it -> it.getCategory().getParent() != null
+                                && Objects.equals(it.getCategory().getParent().getId(), category.getId()))
+                        .collect(Collectors.toSet());
+                for (UzumGQLResponse.ResponseCategoryWrapper responseCategory : responseCategories) {
+                    childrenCategories.add(getChildrenCategory(responseCategory, categoryTree, category.isEco()));
+                }
+                categoryMessage.setChildren(childrenCategories);
+            }
         }
+
         return categoryMessage;
+    }
+
+    private UzumCategoryMessage getChildrenCategory(UzumGQLResponse.ResponseCategoryWrapper responseCategory,
+                                                    List<UzumGQLResponse.ResponseCategoryWrapper> categoryTree, boolean isEco) {
+
+        UzumGQLResponse.ResponseCategory childCategory = responseCategory.getCategory();
+        UzumCategoryMessage childCategoryMessage = UzumCategoryMessage.builder()
+                .id(childCategory.getId())
+                .adult(childCategory.isAdult())
+                .eco(isEco)
+                .title(childCategory.getTitle())
+                .time(Instant.now().toEpochMilli())
+                .build();
+        if (hasChildren(childCategory.getId(), categoryTree)) {
+            List<UzumCategoryMessage> childrenCategories = new ArrayList<>();
+            Set<UzumGQLResponse.ResponseCategoryWrapper> responseCategories = categoryTree.stream()
+                    .filter(it -> it.getCategory().getParent() != null
+                            && Objects.equals(it.getCategory().getParent().getId(), childCategory.getId()))
+                    .collect(Collectors.toSet());
+            for (UzumGQLResponse.ResponseCategoryWrapper category : responseCategories) {
+                childrenCategories.add(getChildrenCategory(category, categoryTree, isEco));
+            }
+            childCategoryMessage.setChildren(childrenCategories);
+        }
+
+        return childCategoryMessage;
+    }
+
+    private boolean hasChildren(Long categoryId, List<UzumGQLResponse.ResponseCategoryWrapper> categoryTree) {
+        return categoryTree.stream().anyMatch(it -> it.getCategory().getParent() != null
+                && Objects.equals(it.getCategory().getParent().getId(), categoryId));
+
     }
 }
