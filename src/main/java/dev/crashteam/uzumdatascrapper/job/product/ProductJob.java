@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.quartz.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.connection.RedisStreamCommands;
 import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -37,9 +36,6 @@ import java.util.concurrent.atomic.AtomicLong;
 @DisallowConcurrentExecution
 @RequiredArgsConstructor
 public class ProductJob implements Job {
-
-    @Autowired
-    RedisStreamCommands streamCommands;
 
     @Autowired
     JobUtilService jobUtilService;

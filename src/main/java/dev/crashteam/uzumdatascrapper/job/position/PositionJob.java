@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.crashteam.uzumdatascrapper.exception.UzumGqlRequestException;
 import dev.crashteam.uzumdatascrapper.model.Constant;
 import dev.crashteam.uzumdatascrapper.model.dto.ProductPositionMessage;
+import dev.crashteam.uzumdatascrapper.model.stream.RedisStreamMessage;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLResponse;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumProduct;
 import dev.crashteam.uzumdatascrapper.service.JobUtilService;
@@ -13,13 +14,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.quartz.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.connection.RedisStreamCommands;
-import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -39,9 +37,6 @@ public class PositionJob implements Job {
 
     @Autowired
     JobUtilService jobUtilService;
-
-    @Autowired
-    RedisStreamCommands streamCommands;
 
     @Autowired
     ObjectMapper objectMapper;
@@ -174,9 +169,8 @@ public class PositionJob implements Job {
                             .categoryId(categoryId)
                             .time(Instant.now().toEpochMilli())
                             .build();
-                    RecordId recordId = streamCommands.xAdd(MapRecord.create(streamKey.getBytes(StandardCharsets.UTF_8),
-                            Collections.singletonMap("position".getBytes(StandardCharsets.UTF_8),
-                                    objectMapper.writeValueAsBytes(positionMessage))), RedisStreamCommands.XAddOptions.maxlen(maxlen));
+                    RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, positionMessage, maxlen,
+                            "position", waitPending));
                     log.info("Posted [stream={}] position record with id - [{}] for category id - [{}], product id - [{}], sku id - [{}]",
                             streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
                 }
@@ -195,9 +189,8 @@ public class PositionJob implements Job {
                             .categoryId(categoryId)
                             .time(Instant.now().toEpochMilli())
                             .build();
-                    RecordId recordId = streamCommands.xAdd(MapRecord.create(streamKey.getBytes(StandardCharsets.UTF_8),
-                            Collections.singletonMap("position".getBytes(StandardCharsets.UTF_8),
-                                    objectMapper.writeValueAsBytes(positionMessage))), RedisStreamCommands.XAddOptions.maxlen(maxlen));
+                    RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, positionMessage, maxlen,
+                            "position", waitPending));
                     log.info("Posted [stream={}] position record with id - [{}], for category id - [{}], product id - [{}], sku id - [{}]",
                             streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
                 }
