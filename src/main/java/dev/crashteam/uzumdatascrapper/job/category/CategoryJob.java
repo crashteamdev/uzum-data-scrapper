@@ -3,8 +3,10 @@ package dev.crashteam.uzumdatascrapper.job.category;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.crashteam.uzumdatascrapper.exception.CategoryRequestException;
 import dev.crashteam.uzumdatascrapper.model.dto.UzumCategoryMessage;
+import dev.crashteam.uzumdatascrapper.model.stream.RedisStreamMessage;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumCategory;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLResponse;
+import dev.crashteam.uzumdatascrapper.service.RedisStreamMessagePublisher;
 import dev.crashteam.uzumdatascrapper.service.integration.UzumService;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -14,16 +16,17 @@ import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.connection.RedisStreamCommands;
 import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.retry.RetryCallback;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,15 +44,21 @@ public class CategoryJob implements Job {
     RetryTemplate retryTemplate;
 
     @Autowired
-    RedisStreamCommands streamCommands;
+    ObjectMapper objectMapper;
 
     @Autowired
-    ObjectMapper objectMapper;
+    RedisStreamMessagePublisher messagePublisher;
 
     ExecutorService jobExecutor = Executors.newWorkStealingPool(6);
 
     @Value("${app.stream.category.key}")
     public String streamKey;
+
+    @Value("${app.stream.category.maxlen}")
+    public Long maxlen;
+
+    @Value("${app.stream.category.waitPending}")
+    public Long waitPending;
 
     @Override
     @SneakyThrows
@@ -80,9 +89,8 @@ public class CategoryJob implements Job {
     private Callable<Void> postCategoryRecord(UzumCategory.Data rootCategory, List<UzumGQLResponse.ResponseCategoryWrapper> categoryTree) {
         return () -> {
             UzumCategoryMessage categoryMessage = categoryToMessage(rootCategory, categoryTree);
-            RecordId recordId = streamCommands.xAdd(streamKey.getBytes(StandardCharsets.UTF_8),
-                    Collections.singletonMap("category".getBytes(StandardCharsets.UTF_8),
-                            objectMapper.writeValueAsBytes(categoryMessage)));
+            RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, categoryMessage, maxlen,
+                    "category", waitPending));
             log.info("Posted [stream={}] category record with record_id - [{}] and category_id - [{}]",
                     streamKey, recordId, rootCategory.getId());
             return null;
