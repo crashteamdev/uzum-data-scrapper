@@ -1,4 +1,4 @@
-package dev.crashteam.uzumdatascrapper.service;
+package dev.crashteam.uzumdatascrapper.service.stream;
 
 import dev.crashteam.uzumdatascrapper.model.stream.Message;
 

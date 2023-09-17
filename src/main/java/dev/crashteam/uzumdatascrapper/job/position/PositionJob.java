@@ -1,14 +1,21 @@
 package dev.crashteam.uzumdatascrapper.job.position;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.Timestamp;
+import dev.crashteam.uzum.scrapper.data.v1.UzumProductCategoryPositionChange;
+import dev.crashteam.uzum.scrapper.data.v1.UzumProductChange;
+import dev.crashteam.uzum.scrapper.data.v1.UzumScrapperEvent;
 import dev.crashteam.uzumdatascrapper.exception.UzumGqlRequestException;
+import dev.crashteam.uzumdatascrapper.mapper.ProductCorruptedException;
 import dev.crashteam.uzumdatascrapper.model.Constant;
 import dev.crashteam.uzumdatascrapper.model.dto.ProductPositionMessage;
+import dev.crashteam.uzumdatascrapper.model.stream.AwsStreamMessage;
 import dev.crashteam.uzumdatascrapper.model.stream.RedisStreamMessage;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLResponse;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumProduct;
 import dev.crashteam.uzumdatascrapper.service.JobUtilService;
-import dev.crashteam.uzumdatascrapper.service.RedisStreamMessagePublisher;
+import dev.crashteam.uzumdatascrapper.service.stream.AwsStreamMessagePublisher;
+import dev.crashteam.uzumdatascrapper.service.stream.RedisStreamMessagePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.*;
@@ -20,10 +27,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -44,6 +48,9 @@ public class PositionJob implements Job {
     @Autowired
     RedisStreamMessagePublisher messagePublisher;
 
+    @Autowired
+    AwsStreamMessagePublisher awsStreamMessagePublisher;
+
     @Value("${app.stream.position.key}")
     public String streamKey;
 
@@ -52,6 +59,9 @@ public class PositionJob implements Job {
 
     @Value("${app.stream.position.waitPending}")
     public Long waitPending;
+
+    @Value("${app.aws-stream.uzum-stream.name}")
+    public String streamName;
 
     ExecutorService jobExecutor = Executors.newWorkStealingPool(3);
 
@@ -191,11 +201,38 @@ public class PositionJob implements Job {
                             .build();
                     RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, positionMessage, maxlen,
                             "position", waitPending));
+                    publishAwsMessage(position.get(), productItemCard.getProductId(), skuId, categoryId);
                     log.info("Posted [stream={}] position record with id - [{}], for category id - [{}], product id - [{}], sku id - [{}]",
                             streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
                 }
             }
             return null;
         };
+    }
+
+    private void publishAwsMessage(Long position, Long productId, Long skuId, Long categoryId) {
+        try {
+            Instant now = Instant.now();
+            var uzumProductCategoryPositionChange = UzumProductCategoryPositionChange.newBuilder()
+                    .setPosition(position)
+                    .setProductId(productId)
+                    .setSkuId(skuId)
+                    .setCategoryId(categoryId).build();
+            UzumScrapperEvent scrapperEvent = UzumScrapperEvent.newBuilder()
+                    .setEventId(UUID.randomUUID().toString())
+                    .setScrapTime(Timestamp.newBuilder()
+                            .setSeconds(now.getEpochSecond())
+                            .setNanos(now.getNano())
+                            .build())
+                    .setEventPayload(UzumScrapperEvent.EventPayload.newBuilder()
+                            .setUzumProductPositionChange(uzumProductCategoryPositionChange)
+                            .build())
+                    .build();
+            awsStreamMessagePublisher.publish(
+                    new AwsStreamMessage(streamName, productId.toString(), scrapperEvent)
+            );
+        } catch (Exception ex) {
+            log.error("Unexpected exception during publish AWS stream message", ex);
+        }
     }
 }
