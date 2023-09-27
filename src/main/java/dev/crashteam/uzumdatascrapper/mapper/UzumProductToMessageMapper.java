@@ -6,6 +6,7 @@ import dev.crashteam.uzum.scrapper.data.v1.UzumSkuCharacteristic;
 import dev.crashteam.uzum.scrapper.data.v1.UzumValue;
 import dev.crashteam.uzumdatascrapper.model.dto.UzumProductMessage;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumProduct;
+import lombok.val;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -57,14 +58,16 @@ public class UzumProductToMessageMapper {
                     if (productPhoto == null) {
                         isCorrupted.set(true);
                     }
-                    return UzumProductChange.UzumProductSku.newBuilder()
+                    val uzumProductBuilder = UzumProductChange.UzumProductSku.newBuilder()
                             .setSkuId(sku.getId().toString())
                             .setAvailableAmount(sku.getAvailableAmount())
-                            .setFullPrice(sku.getFullPrice())
                             .setPurchasePrice(sku.getPurchasePrice())
                             .addAllCharacteristics(characteristics)
-                            .setPhotoKey(productPhoto != null ? productPhoto.getPhotoKey() : null)
-                            .build();
+                            .setPhotoKey(productPhoto != null ? productPhoto.getPhotoKey() : null);
+                    if (sku.getFullPrice() != null) {
+                        uzumProductBuilder.setFullPrice(sku.getFullPrice());
+                    }
+                    return uzumProductBuilder.build();
                 }).toList();
         if (isCorrupted.get()) {
             throw new ProductCorruptedException("Corrupted item. productId=%s".formatted(productData.getId()));
