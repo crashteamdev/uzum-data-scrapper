@@ -5,8 +5,7 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class RedisStreamMessage extends Message {
-
+public class RedisStreamMessage extends Message<Object> {
     private long maxLen;
     private String messageKey;
     private Long waitPending;

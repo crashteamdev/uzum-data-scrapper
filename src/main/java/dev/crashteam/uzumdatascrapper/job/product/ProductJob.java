@@ -1,14 +1,20 @@
 package dev.crashteam.uzumdatascrapper.job.product;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.Timestamp;
+import dev.crashteam.uzum.scrapper.data.v1.UzumProductChange;
+import dev.crashteam.uzum.scrapper.data.v1.UzumScrapperEvent;
+import dev.crashteam.uzumdatascrapper.mapper.ProductCorruptedException;
 import dev.crashteam.uzumdatascrapper.mapper.UzumProductToMessageMapper;
 import dev.crashteam.uzumdatascrapper.model.Constant;
 import dev.crashteam.uzumdatascrapper.model.dto.UzumProductMessage;
+import dev.crashteam.uzumdatascrapper.model.stream.AwsStreamMessage;
 import dev.crashteam.uzumdatascrapper.model.stream.RedisStreamMessage;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLResponse;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumProduct;
 import dev.crashteam.uzumdatascrapper.service.JobUtilService;
-import dev.crashteam.uzumdatascrapper.service.RedisStreamMessagePublisher;
+import dev.crashteam.uzumdatascrapper.service.stream.AwsStreamMessagePublisher;
+import dev.crashteam.uzumdatascrapper.service.stream.RedisStreamMessagePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -21,10 +27,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -47,7 +50,13 @@ public class ProductJob implements Job {
     RedisStreamMessagePublisher messagePublisher;
 
     @Autowired
+    AwsStreamMessagePublisher awsStreamMessagePublisher;
+
+    @Autowired
     UzumProductToMessageMapper messageMapper;
+
+    @Value("${app.aws-stream.uzum-stream.name}")
+    public String streamName;
 
     ExecutorService jobExecutor = Executors.newWorkStealingPool(3);
 
@@ -85,7 +94,7 @@ public class ProductJob implements Job {
                         break;
                     }
                     var productItems = Optional.ofNullable(gqlResponse.getData()
-                            .getMakeSearch())
+                                    .getMakeSearch())
                             .map(UzumGQLResponse.MakeSearch::getItems)
                             .filter(it -> !CollectionUtils.isEmpty(it))
                             .orElse(Collections.emptyList());
@@ -142,9 +151,35 @@ public class ProductJob implements Job {
             }
             RecordId recordId = messagePublisher
                     .publish(new RedisStreamMessage(streamKey, productMessage, maxlen, "item", waitPending));
+
+            publishAwsMessage(productData.getId().toString(), productData);
             log.info("Posted product record [stream={}] with id - {}, for category id - [{}], product id - [{}]", streamKey,
                     recordId, categoryId, itemId);
             return null;
         };
+    }
+
+    private void publishAwsMessage(String partitionKey, UzumProduct.ProductData productData) {
+        try {
+            Instant now = Instant.now();
+            UzumProductChange uzumProductChange = messageMapper.mapToMessage(productData);
+            UzumScrapperEvent scrapperEvent = UzumScrapperEvent.newBuilder()
+                    .setEventId(UUID.randomUUID().toString())
+                    .setScrapTime(Timestamp.newBuilder()
+                            .setSeconds(now.getEpochSecond())
+                            .setNanos(now.getNano())
+                            .build())
+                    .setEventPayload(UzumScrapperEvent.EventPayload.newBuilder()
+                            .setUzumProductChange(uzumProductChange)
+                            .build())
+                    .build();
+            awsStreamMessagePublisher.publish(
+                    new AwsStreamMessage(streamName, partitionKey, scrapperEvent)
+            );
+        } catch (ProductCorruptedException ex) {
+            log.warn("Corrupted product item, ignoring it", ex);
+        } catch (Exception ex) {
+            log.error("Unexpected exception during publish AWS stream message", ex);
+        }
     }
 }

@@ -7,8 +7,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Message {
+public class Message<T> {
 
     private String topic;
-    private Object message;
+    private T message;
 }
