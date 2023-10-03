@@ -73,13 +73,12 @@ public class UzumProductToMessageMapper {
             throw new ProductCorruptedException("Corrupted item. productId=%s".formatted(productData.getId()));
         }
 
-        return UzumProductChange.newBuilder()
+        UzumProductChange.Builder builder = UzumProductChange.newBuilder()
                 .setRating(Double.parseDouble(productData.getRating()))
                 .setCategory(mapCategory(productData.getCategory()))
                 .setOrders(productData.getOrdersAmount())
                 .setProductId(productData.getId().toString())
                 .setReviewsAmount(productData.getReviewsAmount())
-                .setDescription(productData.getDescription())
                 .addAllTags(productData.getTags())
                 .addAllAttributes(productData.getAttributes())
                 .setTitle(productData.getTitle())
@@ -88,8 +87,11 @@ public class UzumProductToMessageMapper {
                 .addAllSkus(skuList)
                 .addAllCharacteristics(characteristicsData)
                 .setIsEco(productData.isEco())
-                .setIsAdult(productData.isAdultCategory())
-                .build();
+                .setIsAdult(productData.isAdultCategory());
+        if (productData.getDescription() != null) {
+            builder.setDescription(productData.getDescription());
+        }
+        return builder.build();
     }
 
     private UzumProduct.ProductPhoto extractProductPhoto(UzumProduct.ProductData product, UzumProduct.SkuData sku) {
