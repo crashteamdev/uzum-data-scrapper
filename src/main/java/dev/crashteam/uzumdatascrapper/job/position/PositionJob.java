@@ -1,12 +1,12 @@
 package dev.crashteam.uzumdatascrapper.job.position;
 
+import com.amazonaws.services.kinesis.model.PutRecordsRequestEntry;
+import com.amazonaws.services.kinesis.model.PutRecordsResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.Timestamp;
 import dev.crashteam.uzum.scrapper.data.v1.UzumProductCategoryPositionChange;
-import dev.crashteam.uzum.scrapper.data.v1.UzumProductChange;
 import dev.crashteam.uzum.scrapper.data.v1.UzumScrapperEvent;
 import dev.crashteam.uzumdatascrapper.exception.UzumGqlRequestException;
-import dev.crashteam.uzumdatascrapper.mapper.ProductCorruptedException;
 import dev.crashteam.uzumdatascrapper.model.Constant;
 import dev.crashteam.uzumdatascrapper.model.dto.ProductPositionMessage;
 import dev.crashteam.uzumdatascrapper.model.stream.AwsStreamMessage;
@@ -25,12 +25,14 @@ import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
@@ -90,7 +92,7 @@ public class PositionJob implements Job {
                         break;
                     }
                     var productItems = Optional.ofNullable(gqlResponse.getData()
-                            .getMakeSearch())
+                                    .getMakeSearch())
                             .map(UzumGQLResponse.MakeSearch::getItems)
                             .filter(it -> !CollectionUtils.isEmpty(it))
                             .orElse(Collections.emptyList());
@@ -101,11 +103,21 @@ public class PositionJob implements Job {
                         continue;
                     }
                     log.info("Iterate through products for position itemsCount={};categoryId={}", productItems.size(), categoryId);
-                    List<Callable<Void>> callables = new ArrayList<>();
+                    List<Callable<List<PutRecordsRequestEntry>>> callables = new ArrayList<>();
                     for (UzumGQLResponse.CatalogCardWrapper productItem : productItems) {
                         callables.add(postPositionRecord(productItem, position, categoryId));
                     }
-                    jobExecutor.invokeAll(callables);
+                    List<Future<List<PutRecordsRequestEntry>>> futures = jobExecutor.invokeAll(callables);
+                    futures.forEach(it -> {
+                        try {
+                            List<PutRecordsRequestEntry> entries = it.get();
+                            PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, entries));
+                            log.info("POSITION JOB : Posted [{}] records to AWS stream - [{}] for category - [{}]",
+                                    recordsResult.getRecords().size(), streamName, categoryId);
+                        } catch (Exception e) {
+                            log.error("Error while trying to get AWS entries for position job:", e);
+                        }
+                    });
                     offset.addAndGet(limit);
                     totalItemProcessed.addAndGet(productItems.size());
                     jobExecutionContext.getJobDetail().getJobDataMap().put("totalItemProcessed", totalItemProcessed);
@@ -124,7 +136,7 @@ public class PositionJob implements Job {
                 Duration.between(start, end).toSeconds());
     }
 
-    private Callable<Void> postPositionRecord(UzumGQLResponse.CatalogCardWrapper productItem, AtomicLong position, Long categoryId) {
+    private Callable<List<PutRecordsRequestEntry>> postPositionRecord(UzumGQLResponse.CatalogCardWrapper productItem, AtomicLong position, Long categoryId) {
         return () -> {
             position.incrementAndGet();
             Long itemId = Optional.ofNullable(productItem.getCatalogCard()).map(UzumGQLResponse.CatalogCard::getProductId)
@@ -136,6 +148,7 @@ public class PositionJob implements Job {
                 log.info("Product data with id - %s returned null, continue with next item, if it exists...".formatted(itemId));
                 return null;
             }
+            List<PutRecordsRequestEntry> entries = new ArrayList<>();
             if (!CollectionUtils.isEmpty(productItemCardCharacteristics)) {
                 var productItemCardCharacteristic = productItemCardCharacteristics.get(0);
                 var characteristicId = productItemCardCharacteristic.getId();
@@ -183,6 +196,7 @@ public class PositionJob implements Job {
                             "position", waitPending));
                     log.info("Posted [stream={}] position record with id - [{}] for category id - [{}], product id - [{}], sku id - [{}]",
                             streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
+                    entries.add(getAwsMessage(position.get(), productItemCard.getProductId(), skuId, categoryId));
                 }
             } else {
                 List<Long> skuIds = productResponse.getSkuList()
@@ -201,16 +215,16 @@ public class PositionJob implements Job {
                             .build();
                     RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, positionMessage, maxlen,
                             "position", waitPending));
-                    publishAwsMessage(position.get(), productItemCard.getProductId(), skuId, categoryId);
                     log.info("Posted [stream={}] position record with id - [{}], for category id - [{}], product id - [{}], sku id - [{}]",
                             streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
+                    entries.add(getAwsMessage(position.get(), productItemCard.getProductId(), skuId, categoryId));
                 }
             }
-            return null;
+            return entries;
         };
     }
 
-    private void publishAwsMessage(Long position, Long productId, Long skuId, Long categoryId) {
+    private PutRecordsRequestEntry getAwsMessage(Long position, Long productId, Long skuId, Long categoryId) {
         try {
             Instant now = Instant.now();
             var uzumProductCategoryPositionChange = UzumProductCategoryPositionChange.newBuilder()
@@ -228,11 +242,13 @@ public class PositionJob implements Job {
                             .setUzumProductPositionChange(uzumProductCategoryPositionChange)
                             .build())
                     .build();
-            awsStreamMessagePublisher.publish(
-                    new AwsStreamMessage(streamName, productId.toString(), scrapperEvent)
-            );
+            PutRecordsRequestEntry requestEntry = new PutRecordsRequestEntry();
+            requestEntry.setPartitionKey(productId.toString());
+            requestEntry.setData(ByteBuffer.wrap(scrapperEvent.toByteArray()));
+            return requestEntry;
         } catch (Exception ex) {
-            log.error("Unexpected exception during publish AWS stream message", ex);
+            log.error("Unexpected exception during publish AWS stream message returning NULL", ex);
         }
+        return null;
     }
 }

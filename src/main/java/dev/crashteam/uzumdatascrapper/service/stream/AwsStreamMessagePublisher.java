@@ -1,5 +1,6 @@
 package dev.crashteam.uzumdatascrapper.service.stream;
 
+import com.amazonaws.services.kinesis.model.PutRecordsResult;
 import dev.crashteam.uzumdatascrapper.aws.AwsStreamClient;
 import dev.crashteam.uzumdatascrapper.model.stream.AwsStreamMessage;
 import lombok.RequiredArgsConstructor;
@@ -14,11 +15,10 @@ public class AwsStreamMessagePublisher implements MessagePublisher<AwsStreamMess
 
     @SneakyThrows
     @Override
-    public Object publish(AwsStreamMessage message) {
+    public PutRecordsResult publish(AwsStreamMessage message) {
         return awsStreamClient.sendMessage(
                 message.getTopic(),
-                message.getPartitionKey(),
-                message.getMessage().toByteArray()
+                message.getMessage()
         );
     }
 }

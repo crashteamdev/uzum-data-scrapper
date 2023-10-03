@@ -1,5 +1,7 @@
 package dev.crashteam.uzumdatascrapper.job.category;
 
+import com.amazonaws.services.kinesis.model.PutRecordsRequestEntry;
+import com.amazonaws.services.kinesis.model.PutRecordsResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.Timestamp;
 import dev.crashteam.uzum.scrapper.data.v1.UzumCategoryChange;
@@ -27,6 +29,7 @@ import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -79,13 +82,24 @@ public class CategoryJob implements Job {
                 }
                 return categoryData;
             });
-            List<Callable<Void>> callables = new ArrayList<>();
+            List<Callable<PutRecordsRequestEntry>> callables = new ArrayList<>();
+            List<PutRecordsRequestEntry> entries = new ArrayList<>();
             UzumGQLResponse gqlResponse = uzumService.retryableGQLRequest(1, 0, 0);
             List<UzumGQLResponse.ResponseCategoryWrapper> categoryTree = gqlResponse.getData().getMakeSearch().getCategoryTree();
             for (UzumCategory.Data rootCategory : rootCategories) {
                 callables.add(postCategoryRecord(rootCategory, categoryTree));
             }
-            jobExecutor.invokeAll(callables);
+            jobExecutor.invokeAll(callables)
+                    .forEach(it -> {
+                        try {
+                            entries.add(it.get());
+                        } catch (Exception e) {
+                            log.error("Error while trying to fill AWS entries:", e);
+                        }
+                    });
+            PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(awsStreamName, entries));
+            log.info("CATEGORY JOB : Posted [{}] records to AWS stream - [{}]",
+                    recordsResult.getRecords().size(), awsStreamName);
         } finally {
             jobExecutor.shutdown();
         }
@@ -94,7 +108,7 @@ public class CategoryJob implements Job {
     }
 
     @SneakyThrows
-    private Callable<Void> postCategoryRecord(
+    private Callable<PutRecordsRequestEntry> postCategoryRecord(
             UzumCategory.Data rootCategory,
             List<UzumGQLResponse.ResponseCategoryWrapper> categoryTree
     ) {
@@ -102,10 +116,10 @@ public class CategoryJob implements Job {
             UzumCategoryMessage categoryMessage = categoryToMessage(rootCategory, categoryTree);
             RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, categoryMessage, maxlen,
                     "category", waitPending));
-            publishAwsMessage(rootCategory, categoryTree);
+
             log.info("Posted [stream={}] category record with record_id - [{}] and category_id - [{}]",
                     streamKey, recordId, rootCategory.getId());
-            return null;
+            return getAwsMessage(rootCategory, categoryTree);
         };
     }
 
@@ -229,7 +243,7 @@ public class CategoryJob implements Job {
                 && Objects.equals(it.getCategory().getParent().getId(), categoryId));
     }
 
-    private void publishAwsMessage(
+    private PutRecordsRequestEntry getAwsMessage(
             UzumCategory.Data category,
             List<UzumGQLResponse.ResponseCategoryWrapper> categoryTree) {
         try {
@@ -246,11 +260,13 @@ public class CategoryJob implements Job {
                                     .setCategory(uzumCategory).build())
                             .build())
                     .build();
-            awsStreamMessagePublisher.publish(
-                    new AwsStreamMessage(awsStreamName, String.valueOf(category.getId()), scrapperEvent)
-            );
+            PutRecordsRequestEntry requestEntry = new PutRecordsRequestEntry();
+            requestEntry.setPartitionKey(String.valueOf(category.getId()));
+            requestEntry.setData(ByteBuffer.wrap(scrapperEvent.toByteArray()));
+            return requestEntry;
         } catch (Exception ex) {
-            log.error("Unexpected exception during publish AWS stream message", ex);
+            log.error("Unexpected exception during publish AWS stream message returning NULL", ex);
         }
+        return null;
     }
 }

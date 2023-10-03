@@ -1,5 +1,7 @@
 package dev.crashteam.uzumdatascrapper.job.product;
 
+import com.amazonaws.services.kinesis.model.PutRecordsRequestEntry;
+import com.amazonaws.services.kinesis.model.PutRecordsResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.Timestamp;
 import dev.crashteam.uzum.scrapper.data.v1.UzumProductChange;
@@ -25,12 +27,14 @@ import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 
@@ -104,13 +108,25 @@ public class ProductJob implements Job {
                         jobExecutionContext.getJobDetail().getJobDataMap().put("offset", offset);
                         continue;
                     }
-                    log.info("Iterate through products for itemsCount={};categoryId={}", productItems.size(), categoryId);
+                    log.info("Iterate through products for itemsCount - [{}] categoryId - [{}]", productItems.size(), categoryId);
 
-                    List<Callable<Void>> callables = new ArrayList<>();
+                    List<Callable<PutRecordsRequestEntry>> callables = new ArrayList<>();
+                    List<PutRecordsRequestEntry> entries = new ArrayList<>();
                     for (UzumGQLResponse.CatalogCardWrapper productItem : productItems) {
                         callables.add(postProductRecord(productItem, categoryId));
                     }
-                    jobExecutor.invokeAll(callables);
+                    List<Future<PutRecordsRequestEntry>> futures = jobExecutor.invokeAll(callables);
+                    futures.forEach(it -> {
+                        try {
+                            entries.add(it.get());
+                        } catch (Exception e) {
+                            log.error("Error while trying to fill AWS entries:", e);
+                        }
+                    });
+                    PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, entries));
+                    log.info("PRODUCT JOB : Posted [{}] records to AWS stream - [{}] for category - [{}]",
+                            recordsResult.getRecords().size(), streamName, categoryId);
+
                     offset.addAndGet(limit);
                     totalItemProcessed.addAndGet(productItems.size());
                     jobExecutionContext.getJobDetail().getJobDataMap().put("offset", offset);
@@ -128,7 +144,7 @@ public class ProductJob implements Job {
                 Duration.between(start, end).toSeconds());
     }
 
-    private Callable<Void> postProductRecord(UzumGQLResponse.CatalogCardWrapper productItem, Long categoryId) {
+    private Callable<PutRecordsRequestEntry> postProductRecord(UzumGQLResponse.CatalogCardWrapper productItem, Long categoryId) {
         return () -> {
             Long itemId = Optional.ofNullable(productItem.getCatalogCard())
                     .map(UzumGQLResponse.CatalogCard::getProductId)
@@ -151,15 +167,14 @@ public class ProductJob implements Job {
             }
             RecordId recordId = messagePublisher
                     .publish(new RedisStreamMessage(streamKey, productMessage, maxlen, "item", waitPending));
-
-            publishAwsMessage(productData.getId().toString(), productData);
             log.info("Posted product record [stream={}] with id - {}, for category id - [{}], product id - [{}]", streamKey,
                     recordId, categoryId, itemId);
-            return null;
+
+            return getAwsMessageEntry(productData.getId().toString(), productData);
         };
     }
 
-    private void publishAwsMessage(String partitionKey, UzumProduct.ProductData productData) {
+    private PutRecordsRequestEntry getAwsMessageEntry(String partitionKey, UzumProduct.ProductData productData) {
         try {
             Instant now = Instant.now();
             UzumProductChange uzumProductChange = messageMapper.mapToMessage(productData);
@@ -173,13 +188,15 @@ public class ProductJob implements Job {
                             .setUzumProductChange(uzumProductChange)
                             .build())
                     .build();
-            awsStreamMessagePublisher.publish(
-                    new AwsStreamMessage(streamName, partitionKey, scrapperEvent)
-            );
+            PutRecordsRequestEntry requestEntry = new PutRecordsRequestEntry();
+            requestEntry.setPartitionKey(partitionKey);
+            requestEntry.setData(ByteBuffer.wrap(scrapperEvent.toByteArray()));
+            return requestEntry;
         } catch (ProductCorruptedException ex) {
             log.warn("Corrupted product item, ignoring it", ex);
         } catch (Exception ex) {
             log.error("Unexpected exception during publish AWS stream message", ex);
         }
+        return null;
     }
 }
