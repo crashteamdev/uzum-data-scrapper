@@ -126,7 +126,7 @@ public class ProductJob implements Job {
 
                     try {
                         PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, entries));
-                        log.info("PRODUCT JOB : Posted [{}] records to AWS stream - [{}] for category - [{}]",
+                        log.info("PRODUCT JOB : Posted [{}] records to AWS stream - [{}] for categoryId - [{}]",
                                 recordsResult.getRecords().size(), streamName, categoryId);
                     } catch (Exception e) {
                         log.error("PRODUCT JOB : AWS ERROR, couldn't publish to stream - [{}] for category - [{}]", streamName, categoryId,  e);

@@ -122,7 +122,7 @@ public class PositionJob implements Job {
                             .toList();
                     try {
                         PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, requestEntries));
-                        log.info("POSITION JOB : Posted [{}] records to AWS stream - [{}] for category - [{}]",
+                        log.info("POSITION JOB : Posted [{}] records to AWS stream - [{}] for categoryId - [{}]",
                                 recordsResult.getRecords().size(), streamName, categoryId);
                     } catch (Exception e) {
                         log.error("POSITION JOB : AWS ERROR, couldn't publish to stream - [{}] for category - [{}]", streamName, categoryId, e);
