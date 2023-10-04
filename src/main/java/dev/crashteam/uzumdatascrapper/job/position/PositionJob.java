@@ -34,6 +34,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Component
@@ -108,16 +110,23 @@ public class PositionJob implements Job {
                         callables.add(postPositionRecord(productItem, position, categoryId));
                     }
                     List<Future<List<PutRecordsRequestEntry>>> futures = jobExecutor.invokeAll(callables);
-                    futures.forEach(it -> {
-                        try {
-                            List<PutRecordsRequestEntry> entries = it.get();
-                            PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, entries));
-                            log.info("POSITION JOB : Posted [{}] records to AWS stream - [{}] for category - [{}]",
-                                    recordsResult.getRecords().size(), streamName, categoryId);
-                        } catch (Exception e) {
-                            log.error("Error while trying to get AWS entries for position job:", e);
-                        }
-                    });
+                    List<PutRecordsRequestEntry> requestEntries = futures.stream().map(it -> {
+                                try {
+                                    return it.get();
+                                } catch (Exception e) {
+                                    log.error("Error while trying to get AWS entries for position job:", e);
+                                }
+                                return null;
+                            }).filter(Objects::nonNull)
+                            .flatMap(List::stream)
+                            .toList();
+                    try {
+                        PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, requestEntries));
+                        log.info("POSITION JOB : Posted [{}] records to AWS stream - [{}] for category - [{}]",
+                                recordsResult.getRecords().size(), streamName, categoryId);
+                    } catch (Exception e) {
+                        log.error("POSITION JOB : AWS ERROR, couldn't publish to stream - [{}] for category - [{}]", streamName, categoryId, e);
+                    }
                     offset.addAndGet(limit);
                     totalItemProcessed.addAndGet(productItems.size());
                     jobExecutionContext.getJobDetail().getJobDataMap().put("totalItemProcessed", totalItemProcessed);

@@ -123,9 +123,14 @@ public class ProductJob implements Job {
                             log.error("Error while trying to fill AWS entries:", e);
                         }
                     });
-                    PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, entries));
-                    log.info("PRODUCT JOB : Posted [{}] records to AWS stream - [{}] for category - [{}]",
-                            recordsResult.getRecords().size(), streamName, categoryId);
+
+                    try {
+                        PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, entries));
+                        log.info("PRODUCT JOB : Posted [{}] records to AWS stream - [{}] for category - [{}]",
+                                recordsResult.getRecords().size(), streamName, categoryId);
+                    } catch (Exception e) {
+                        log.error("PRODUCT JOB : AWS ERROR, couldn't publish to stream - [{}] for category - [{}]", streamName, categoryId,  e);
+                    }
 
                     offset.addAndGet(limit);
                     totalItemProcessed.addAndGet(productItems.size());

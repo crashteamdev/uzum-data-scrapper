@@ -97,9 +97,14 @@ public class CategoryJob implements Job {
                             log.error("Error while trying to fill AWS entries:", e);
                         }
                     });
-            PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(awsStreamName, entries));
-            log.info("CATEGORY JOB : Posted [{}] records to AWS stream - [{}]",
-                    recordsResult.getRecords().size(), awsStreamName);
+            try {
+                PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(awsStreamName, entries));
+                log.info("CATEGORY JOB : Posted [{}] records to AWS stream - [{}]",
+                        recordsResult.getRecords().size(), awsStreamName);
+            } catch (Exception e) {
+                log.error("CATEGORY JOB : AWS ERROR, couldn't publish to stream - [{}]", awsStreamName, e);
+            }
+
         } finally {
             jobExecutor.shutdown();
         }
