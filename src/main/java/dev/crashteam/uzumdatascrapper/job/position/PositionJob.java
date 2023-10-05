@@ -16,6 +16,7 @@ import dev.crashteam.uzumdatascrapper.model.uzum.UzumProduct;
 import dev.crashteam.uzumdatascrapper.service.JobUtilService;
 import dev.crashteam.uzumdatascrapper.service.stream.AwsStreamMessagePublisher;
 import dev.crashteam.uzumdatascrapper.service.stream.RedisStreamMessagePublisher;
+import dev.crashteam.uzumdatascrapper.util.ScrapperUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.*;
@@ -120,13 +121,7 @@ public class PositionJob implements Job {
                             }).filter(Objects::nonNull)
                             .flatMap(List::stream)
                             .toList();
-                    try {
-                        PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, requestEntries));
-                        log.info("POSITION JOB : Posted [{}] records to AWS stream - [{}] for categoryId - [{}]",
-                                recordsResult.getRecords().size(), streamName, categoryId);
-                    } catch (Exception e) {
-                        log.error("POSITION JOB : AWS ERROR, couldn't publish to stream - [{}] for category - [{}]", streamName, categoryId, e);
-                    }
+                    publishToAwsStream(requestEntries, categoryId);
                     offset.addAndGet(limit);
                     totalItemProcessed.addAndGet(productItems.size());
                     jobExecutionContext.getJobDetail().getJobDataMap().put("totalItemProcessed", totalItemProcessed);
@@ -143,6 +138,24 @@ public class PositionJob implements Job {
         Instant end = Instant.now();
         log.info("Position job - Finished collecting for category id - {}, in {} seconds", categoryId,
                 Duration.between(start, end).toSeconds());
+    }
+
+    private void publishToAwsStream(List<PutRecordsRequestEntry> requestEntries, Long categoryId) {
+        try {
+            if (requestEntries.size() > 500) {
+                ScrapperUtils.getBatches(requestEntries, 500).forEach(entries -> {
+                    PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, entries));
+                    log.info("POSITION JOB : Posted [{}] records to AWS stream - [{}] for categoryId - [{}]",
+                            recordsResult.getRecords().size(), streamName, categoryId);
+                });
+            } else {
+                PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, requestEntries));
+                log.info("POSITION JOB : Posted [{}] records to AWS stream - [{}] for categoryId - [{}]",
+                        recordsResult.getRecords().size(), streamName, categoryId);
+            }
+        } catch (Exception e) {
+            log.error("POSITION JOB : AWS ERROR, couldn't publish to stream - [{}] for category - [{}]", streamName, categoryId, e);
+        }
     }
 
     private Callable<List<PutRecordsRequestEntry>> postPositionRecord(UzumGQLResponse.CatalogCardWrapper productItem, AtomicLong position, Long categoryId) {
