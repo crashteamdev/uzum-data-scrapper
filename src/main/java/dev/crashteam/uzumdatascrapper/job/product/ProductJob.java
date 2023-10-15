@@ -118,7 +118,9 @@ public class ProductJob implements Job {
                     List<Future<PutRecordsRequestEntry>> futures = jobExecutor.invokeAll(callables);
                     futures.forEach(it -> {
                         try {
-                            entries.add(it.get());
+                            if (it.get() != null) {
+                                entries.add(it.get());
+                            }
                         } catch (Exception e) {
                             log.error("Error while trying to fill AWS entries:", e);
                         }
@@ -129,7 +131,7 @@ public class ProductJob implements Job {
                         log.info("PRODUCT JOB : Posted [{}] records to AWS stream - [{}] for categoryId - [{}]",
                                 recordsResult.getRecords().size(), streamName, categoryId);
                     } catch (Exception e) {
-                        log.error("PRODUCT JOB : AWS ERROR, couldn't publish to stream - [{}] for category - [{}]", streamName, categoryId,  e);
+                        log.error("PRODUCT JOB : AWS ERROR, couldn't publish to stream - [{}] for category - [{}]", streamName, categoryId, e);
                     }
 
                     offset.addAndGet(limit);
@@ -202,6 +204,8 @@ public class ProductJob implements Job {
         } catch (Exception ex) {
             log.error("Unexpected exception during publish AWS stream message", ex);
         }
+        log.warn("AWS message for categoryId - [{}] productId - [{}] is null",
+                productData.getCategory().getId(), productData.getId());
         return null;
     }
 }

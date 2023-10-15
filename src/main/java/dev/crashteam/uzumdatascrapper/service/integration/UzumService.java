@@ -94,12 +94,12 @@ public class UzumService {
     }
 
     @SneakyThrows
-    public Set<Long> getIds(boolean all) {
+    public Set<Long> getIds() {
         log.info("Collecting category id's...");
         Set<Long> ids = new CopyOnWriteArraySet<>();
         List<Callable<Void>> callables = new ArrayList<>();
         for (UzumCategory.Data data : getRootCategories()) {
-            callables.add(extractIdsAsync(data, ids, all));
+            callables.add(extractIdsAsync(data, ids));
         }
         List<Future<Void>> futures = callables.stream()
                 .map(taskExecutor::submit)
@@ -162,7 +162,7 @@ public class UzumService {
     }
 
     public Set<Long> getIdsByGql() {
-        Set<Long> ids = getIds(false);
+        Set<Long> ids = getIds();
         Set<Long> categoryIds = new CopyOnWriteArraySet<>();
         List<Callable<Void>> callables = new ArrayList<>();
         for (Long id : ids) {
@@ -226,6 +226,20 @@ public class UzumService {
             } else {
                 extractIds(data, ids);
             }
+            return null;
+        };
+    }
+
+    private Callable<Void> extractIdsAsync(UzumCategory.Data data, Set<Long> ids) {
+        return () -> {
+            extractIds(data, ids);
+            return null;
+        };
+    }
+
+    private Callable<Void> extractAllIdsAsync(UzumCategory.Data data, Set<Long> ids) {
+        return () -> {
+            extractAllIds(data, ids);
             return null;
         };
     }

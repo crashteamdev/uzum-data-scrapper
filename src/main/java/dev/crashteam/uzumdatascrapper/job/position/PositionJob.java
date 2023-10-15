@@ -35,8 +35,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Slf4j
 @Component
@@ -218,7 +216,10 @@ public class PositionJob implements Job {
                             "position", waitPending));
                     log.info("Posted [stream={}] position record with id - [{}] for category id - [{}], product id - [{}], sku id - [{}]",
                             streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
-                    entries.add(getAwsMessage(position.get(), productItemCard.getProductId(), skuId, categoryId));
+                    PutRecordsRequestEntry awsMessage = getAwsMessage(position.get(), productItemCard.getProductId(), skuId, categoryId);
+                    if (awsMessage != null) {
+                        entries.add(awsMessage);
+                    }
                 }
             } else {
                 List<Long> skuIds = productResponse.getSkuList()
@@ -239,7 +240,10 @@ public class PositionJob implements Job {
                             "position", waitPending));
                     log.info("Posted [stream={}] position record with id - [{}], for category id - [{}], product id - [{}], sku id - [{}]",
                             streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
-                    entries.add(getAwsMessage(position.get(), productItemCard.getProductId(), skuId, categoryId));
+                    PutRecordsRequestEntry awsMessage = getAwsMessage(position.get(), productItemCard.getProductId(), skuId, categoryId);
+                    if (awsMessage != null) {
+                        entries.add(awsMessage);
+                    }
                 }
             }
             return entries;

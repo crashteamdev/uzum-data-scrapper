@@ -23,7 +23,7 @@ public class SimpleTriggerJobCreatorService {
     public void createJob(String jobName, String idKey, Class<? extends Job> jobClass, boolean allIds) {
         Set<Long> ids;
         if (!allIds) {
-            ids = uzumService.getIds(false);
+            ids = uzumService.getIds();
         } else {
             ids = uzumService.getIdsByGql();
         }
