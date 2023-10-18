@@ -17,6 +17,7 @@ import dev.crashteam.uzumdatascrapper.model.uzum.UzumProduct;
 import dev.crashteam.uzumdatascrapper.service.JobUtilService;
 import dev.crashteam.uzumdatascrapper.service.stream.AwsStreamMessagePublisher;
 import dev.crashteam.uzumdatascrapper.service.stream.RedisStreamMessagePublisher;
+import dev.crashteam.uzumdatascrapper.util.ScrapperUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -127,9 +128,11 @@ public class ProductJob implements Job {
                     });
 
                     try {
-                        PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, entries));
-                        log.info("PRODUCT JOB : Posted [{}] records to AWS stream - [{}] for categoryId - [{}]",
-                                recordsResult.getRecords().size(), streamName, categoryId);
+                        for (List<PutRecordsRequestEntry> batch : ScrapperUtils.getBatches(entries, 50)) {
+                            PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, batch));
+                            log.info("PRODUCT JOB : Posted [{}] records to AWS stream - [{}] for categoryId - [{}]",
+                                    recordsResult.getRecords().size(), streamName, categoryId);
+                        }
                     } catch (Exception e) {
                         log.error("PRODUCT JOB : AWS ERROR, couldn't publish to stream - [{}] for category - [{}]", streamName, categoryId, e);
                     }
