@@ -140,8 +140,8 @@ public class PositionJob implements Job {
 
     private void publishToAwsStream(List<PutRecordsRequestEntry> requestEntries, Long categoryId) {
         try {
-            if (requestEntries.size() > 500) {
-                ScrapperUtils.getBatches(requestEntries, 500).forEach(entries -> {
+            if (requestEntries.size() > 100) {
+                ScrapperUtils.getBatches(requestEntries, 100).forEach(entries -> {
                     PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, entries));
                     log.info("POSITION JOB : Posted [{}] records to AWS stream - [{}] for categoryId - [{}]",
                             recordsResult.getRecords().size(), streamName, categoryId);
