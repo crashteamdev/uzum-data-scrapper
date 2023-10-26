@@ -212,10 +212,10 @@ public class PositionJob implements Job {
                             .categoryId(categoryId)
                             .time(Instant.now().toEpochMilli())
                             .build();
-                    RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, positionMessage, maxlen,
-                            "position", waitPending));
-                    log.info("Posted [stream={}] position record with id - [{}] for category id - [{}], product id - [{}], sku id - [{}]",
-                            streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
+//                    RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, positionMessage, maxlen,
+//                            "position", waitPending));
+//                    log.info("Posted [stream={}] position record with id - [{}] for category id - [{}], product id - [{}], sku id - [{}]",
+//                            streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
                     PutRecordsRequestEntry awsMessage = getAwsMessage(position.get(), productItemCard.getProductId(), skuId, categoryId);
                     if (awsMessage != null) {
                         entries.add(awsMessage);
@@ -236,10 +236,10 @@ public class PositionJob implements Job {
                             .categoryId(categoryId)
                             .time(Instant.now().toEpochMilli())
                             .build();
-                    RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, positionMessage, maxlen,
-                            "position", waitPending));
-                    log.info("Posted [stream={}] position record with id - [{}], for category id - [{}], product id - [{}], sku id - [{}]",
-                            streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
+//                    RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, positionMessage, maxlen,
+//                            "position", waitPending));
+//                    log.info("Posted [stream={}] position record with id - [{}], for category id - [{}], product id - [{}], sku id - [{}]",
+//                            streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
                     PutRecordsRequestEntry awsMessage = getAwsMessage(position.get(), productItemCard.getProductId(), skuId, categoryId);
                     if (awsMessage != null) {
                         entries.add(awsMessage);

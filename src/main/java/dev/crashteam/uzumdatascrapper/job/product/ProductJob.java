@@ -175,10 +175,10 @@ public class ProductJob implements Job {
                 log.warn("Product with id - {} is corrupted", productMessage.getProductId());
                 return null;
             }
-            RecordId recordId = messagePublisher
-                    .publish(new RedisStreamMessage(streamKey, productMessage, maxlen, "item", waitPending));
-            log.info("Posted product record [stream={}] with id - {}, for category id - [{}], product id - [{}]", streamKey,
-                    recordId, categoryId, itemId);
+//            RecordId recordId = messagePublisher
+//                    .publish(new RedisStreamMessage(streamKey, productMessage, maxlen, "item", waitPending));
+//            log.info("Posted product record [stream={}] with id - {}, for category id - [{}], product id - [{}]", streamKey,
+//                    recordId, categoryId, itemId);
 
             return getAwsMessageEntry(productData.getId().toString(), productData);
         };
