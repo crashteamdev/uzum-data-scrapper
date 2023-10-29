@@ -32,7 +32,8 @@ public class JobUtilService {
                         .map(UzumProduct.ProductError::getDetailMessage)
                         .findFirst()
                         .orElse("");
-                throw new UzumGqlRequestException("Get product failed with message - %s".formatted(errorMessage));
+                throw new UzumGqlRequestException("Get product with id - %s failed with message - %s"
+                        .formatted(itemId, errorMessage));
             }
             return Optional.ofNullable(product.getPayload()).map(UzumProduct.Payload::getData)
                     .orElseThrow(() -> new UzumGqlRequestException("Product catalog can't be null"));
