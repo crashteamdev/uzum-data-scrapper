@@ -201,7 +201,7 @@ public class ProductJob implements Job {
             PutRecordsRequestEntry requestEntry = new PutRecordsRequestEntry();
             requestEntry.setPartitionKey(partitionKey);
             requestEntry.setData(ByteBuffer.wrap(scrapperEvent.toByteArray()));
-            log.warn("PRODUCT JOB - filling AWS entries for categoryId - [{}] productId - [{}]",
+            log.info("PRODUCT JOB - filling AWS entries for categoryId - [{}] productId - [{}]",
                     productData.getCategory().getId(), productData.getId());
             return requestEntry;
         } catch (ProductCorruptedException ex) {

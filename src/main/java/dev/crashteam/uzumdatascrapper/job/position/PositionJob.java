@@ -271,7 +271,7 @@ public class PositionJob implements Job {
             PutRecordsRequestEntry requestEntry = new PutRecordsRequestEntry();
             requestEntry.setPartitionKey(productId.toString());
             requestEntry.setData(ByteBuffer.wrap(scrapperEvent.toByteArray()));
-            log.warn("POSITION JOB - filling AWS entries for categoryId - [{}] productId - [{}]",
+            log.info("POSITION JOB - filling AWS entries for categoryId - [{}] productId - [{}]",
                     categoryId, productId);
             return requestEntry;
         } catch (Exception ex) {
