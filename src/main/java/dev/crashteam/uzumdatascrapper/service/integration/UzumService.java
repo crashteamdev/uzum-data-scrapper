@@ -2,6 +2,7 @@ package dev.crashteam.uzumdatascrapper.service.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.crashteam.uzumdatascrapper.exception.CategoryRequestException;
+import dev.crashteam.uzumdatascrapper.exception.ProductRequestException;
 import dev.crashteam.uzumdatascrapper.exception.UzumGqlRequestException;
 import dev.crashteam.uzumdatascrapper.model.ProxyRequestParams;
 import dev.crashteam.uzumdatascrapper.model.StyxProxyResult;
@@ -42,21 +43,24 @@ public class UzumService {
 
     private static final String ROOT_URL = "https://api.umarket.uz/api";
 
+    @SneakyThrows
     public List<UzumCategory.Data> getRootCategories() {
-        ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
-                .key("headers")
-                .value(Map.of("Authorization", authToken,
-                        "User-Agent", RandomUserAgent.getRandomUserAgent())).build();
-        Random randomTimeout = new Random();
-        ProxyRequestParams requestParams = ProxyRequestParams.builder()
-                .timeout(randomTimeout.nextLong(50L, timeout))
-                .url(ROOT_URL + "/main/root-categories?eco=false")
-                .httpMethod(HttpMethod.GET.name())
-                .context(Collections.singletonList(headers))
-                .build();
-        StyxProxyResult<UzumCategory> proxyResult = proxyService.getProxyResult(requestParams, new ParameterizedTypeReference<>() {
+        return retryTemplate.execute((RetryCallback<List<UzumCategory.Data>, Exception>) retryContext -> {
+            ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
+                    .key("headers")
+                    .value(Map.of("Authorization", authToken,
+                            "User-Agent", RandomUserAgent.getRandomUserAgent())).build();
+            Random randomTimeout = new Random();
+            ProxyRequestParams requestParams = ProxyRequestParams.builder()
+                    .timeout(randomTimeout.nextLong(50L, timeout))
+                    .url(ROOT_URL + "/main/root-categories?eco=false")
+                    .httpMethod(HttpMethod.GET.name())
+                    .context(Collections.singletonList(headers))
+                    .build();
+            StyxProxyResult<UzumCategory> proxyResult = proxyService.getProxyResult(requestParams, new ParameterizedTypeReference<>() {
+            });
+            return proxyResult.getBody().getPayload();
         });
-        return proxyResult.getBody().getPayload();
     }
 
     public UzumProduct getProduct(Long id) {
