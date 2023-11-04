@@ -17,7 +17,6 @@
         <management.port>8023</management.port>
         <exposed.ports>${server.port} ${management.port}</exposed.ports>
         <java.version>17</java.version>
-        <quartz-redis-jobstore.version>1.2.0</quartz-redis-jobstore.version>
         <spring-retry.version>1.2.5.RELEASE</spring-retry.version>
         <spring-aspects.version>5.2.8.RELEASE</spring-aspects.version>
         <protobuf.version>3.21.12</protobuf.version>
@@ -57,15 +56,27 @@
             <version>1.12.560</version>
         </dependency>
 
+        <!--database-->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!--Scheduling      -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-quartz</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>javax.xml.bind</groupId>
             <artifactId>jaxb-api</artifactId>
             <version>2.3.1</version>
-        </dependency>
-        <dependency>
-            <groupId>net.joelinn</groupId>
-            <artifactId>quartz-redis-jobstore</artifactId>
-            <version>${quartz-redis-jobstore.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.loki4j</groupId>
