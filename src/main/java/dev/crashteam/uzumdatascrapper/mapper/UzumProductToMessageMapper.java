@@ -58,11 +58,22 @@ public class UzumProductToMessageMapper {
                     if (productPhoto == null) {
                         isCorrupted.set(true);
                     }
+                    UzumProductChange.Restriction restriction = UzumProductChange.Restriction.newBuilder().build();
+                    UzumProduct.Restriction skuRestriction = sku.getRestriction();
+                    if (skuRestriction != null) {
+                        restriction = UzumProductChange.Restriction
+                                .newBuilder()
+                                .setBoughtAmount(skuRestriction.getBoughtAmount())
+                                .setRestricted(skuRestriction.getRestricted())
+                                .setRestrictedAmount(skuRestriction.getRestrictedAmount())
+                                .build();
+                    }
                     val uzumProductBuilder = UzumProductChange.UzumProductSku.newBuilder()
                             .setSkuId(sku.getId().toString())
                             .setAvailableAmount(sku.getAvailableAmount())
                             .setPurchasePrice(sku.getPurchasePrice())
                             .addAllCharacteristics(characteristics)
+                            .setRestriction(restriction)
                             .setPhotoKey(productPhoto != null ? productPhoto.getPhotoKey() : null);
                     if (sku.getFullPrice() != null) {
                         uzumProductBuilder.setFullPrice(sku.getFullPrice());
