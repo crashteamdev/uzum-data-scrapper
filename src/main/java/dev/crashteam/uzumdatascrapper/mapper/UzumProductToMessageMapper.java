@@ -64,7 +64,6 @@ public class UzumProductToMessageMapper {
                         restriction = UzumProductChange.Restriction
                                 .newBuilder()
                                 .setBoughtAmount(skuRestriction.getBoughtAmount())
-                                .setRestricted(skuRestriction.getRestricted())
                                 .setRestrictedAmount(skuRestriction.getRestrictedAmount())
                                 .build();
                     }
