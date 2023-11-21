@@ -68,7 +68,8 @@ public class UzumProductToMessageMapper {
                     if (productPhoto != null) {
                         uzumProductBuilder.setPhotoKey(productPhoto.getPhotoKey());
                     }
-                    if (skuRestriction != null && skuRestriction.getRestricted()) {
+                    if (skuRestriction != null && skuRestriction.getRestrictedAmount() != null
+                            && skuRestriction.getRestrictedAmount() > 0) {
                         restriction = UzumProductChange.Restriction
                                 .newBuilder()
                                 .setBoughtAmount(skuRestriction.getBoughtAmount())
