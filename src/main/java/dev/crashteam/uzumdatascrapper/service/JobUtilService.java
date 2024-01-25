@@ -1,5 +1,6 @@
 package dev.crashteam.uzumdatascrapper.service;
 
+import dev.crashteam.uzumdatascrapper.exception.ProductRequestException;
 import dev.crashteam.uzumdatascrapper.exception.UzumGqlRequestException;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLResponse;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumProduct;
@@ -24,7 +25,7 @@ public class JobUtilService {
     private final RetryTemplate retryTemplate;
 
     public UzumProduct.ProductData getProductData(Long itemId) {
-        return retryTemplate.execute((RetryCallback<UzumProduct.ProductData, UzumGqlRequestException>) retryContext -> {
+        return retryTemplate.execute((RetryCallback<UzumProduct.ProductData, ProductRequestException>) retryContext -> {
             UzumProduct product = uzumService.getProduct(itemId);
             if (!CollectionUtils.isEmpty(product.getErrors())) {
                 String errorMessage = product.getErrors()
@@ -32,10 +33,11 @@ public class JobUtilService {
                         .map(UzumProduct.ProductError::getDetailMessage)
                         .findFirst()
                         .orElse("");
-                throw new UzumGqlRequestException("Get product failed with message - %s".formatted(errorMessage));
+                throw new ProductRequestException("Get product with id - %s failed with message - %s"
+                        .formatted(itemId, errorMessage));
             }
             return Optional.ofNullable(product.getPayload()).map(UzumProduct.Payload::getData)
-                    .orElseThrow(() -> new UzumGqlRequestException("Product catalog can't be null"));
+                    .orElseThrow(() -> new ProductRequestException("Product catalog can't be null"));
         });
     }
 

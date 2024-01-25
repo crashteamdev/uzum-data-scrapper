@@ -81,6 +81,14 @@ public class UzumProduct {
         private String purchasePrice;
         private String barcode;
         private Long sellPrice;
+        private Restriction restriction;
+    }
+
+    @Data
+    public static class Restriction {
+        private Long restrictedAmount;
+        private Long boughtAmount;
+        private Boolean restricted;
     }
 
     @Data

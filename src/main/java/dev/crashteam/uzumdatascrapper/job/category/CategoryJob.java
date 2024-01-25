@@ -9,12 +9,10 @@ import dev.crashteam.uzum.scrapper.data.v1.UzumScrapperEvent;
 import dev.crashteam.uzumdatascrapper.exception.CategoryRequestException;
 import dev.crashteam.uzumdatascrapper.model.dto.UzumCategoryMessage;
 import dev.crashteam.uzumdatascrapper.model.stream.AwsStreamMessage;
-import dev.crashteam.uzumdatascrapper.model.stream.RedisStreamMessage;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumCategory;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLResponse;
 import dev.crashteam.uzumdatascrapper.service.integration.UzumService;
 import dev.crashteam.uzumdatascrapper.service.stream.AwsStreamMessagePublisher;
-import dev.crashteam.uzumdatascrapper.service.stream.RedisStreamMessagePublisher;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.DisallowConcurrentExecution;
@@ -23,7 +21,6 @@ import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.retry.RetryCallback;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
@@ -52,9 +49,6 @@ public class CategoryJob implements Job {
     ObjectMapper objectMapper;
 
     @Autowired
-    RedisStreamMessagePublisher messagePublisher;
-
-    @Autowired
     AwsStreamMessagePublisher awsStreamMessagePublisher;
 
     ExecutorService jobExecutor = Executors.newWorkStealingPool(6);
@@ -72,7 +66,6 @@ public class CategoryJob implements Job {
     public String awsStreamName;
 
     @Override
-    @SneakyThrows
     public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
         try {
             List<UzumCategory.Data> rootCategories = retryTemplate.execute((RetryCallback<List<UzumCategory.Data>, CategoryRequestException>) retryContext -> {
@@ -89,14 +82,21 @@ public class CategoryJob implements Job {
             for (UzumCategory.Data rootCategory : rootCategories) {
                 callables.add(postCategoryRecord(rootCategory, categoryTree));
             }
-            jobExecutor.invokeAll(callables)
-                    .forEach(it -> {
-                        try {
-                            entries.add(it.get());
-                        } catch (Exception e) {
-                            log.error("Error while trying to fill AWS entries:", e);
-                        }
-                    });
+
+            try {
+                jobExecutor.invokeAll(callables)
+                        .forEach(it -> {
+                            try {
+                                entries.add(it.get());
+                            } catch (Exception e) {
+                                log.error("Error while trying to fill AWS entries:", e);
+                            }
+                        });
+            } catch (Exception e) {
+                log.error("Error on invoking callables for categories - {}",
+                        Optional.ofNullable(e.getCause()).map(Throwable::getMessage).orElse(""), e);
+            }
+
             try {
                 PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(awsStreamName, entries));
                 log.info("CATEGORY JOB : Posted [{}] records to AWS stream - [{}]",
@@ -117,15 +117,7 @@ public class CategoryJob implements Job {
             UzumCategory.Data rootCategory,
             List<UzumGQLResponse.ResponseCategoryWrapper> categoryTree
     ) {
-        return () -> {
-            UzumCategoryMessage categoryMessage = categoryToMessage(rootCategory, categoryTree);
-            RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, categoryMessage, maxlen,
-                    "category", waitPending));
-
-            log.info("Posted [stream={}] category record with record_id - [{}] and category_id - [{}]",
-                    streamKey, recordId, rootCategory.getId());
-            return getAwsMessage(rootCategory, categoryTree);
-        };
+        return () -> getAwsMessage(rootCategory, categoryTree);
     }
 
     private dev.crashteam.uzum.scrapper.data.v1.UzumCategory mapToMessage(

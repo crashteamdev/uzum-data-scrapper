@@ -140,8 +140,8 @@ public class PositionJob implements Job {
 
     private void publishToAwsStream(List<PutRecordsRequestEntry> requestEntries, Long categoryId) {
         try {
-            if (requestEntries.size() > 500) {
-                ScrapperUtils.getBatches(requestEntries, 500).forEach(entries -> {
+            if (requestEntries.size() > 100) {
+                ScrapperUtils.getBatches(requestEntries, 100).forEach(entries -> {
                     PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, entries));
                     log.info("POSITION JOB : Posted [{}] records to AWS stream - [{}] for categoryId - [{}]",
                             recordsResult.getRecords().size(), streamName, categoryId);
@@ -212,10 +212,10 @@ public class PositionJob implements Job {
                             .categoryId(categoryId)
                             .time(Instant.now().toEpochMilli())
                             .build();
-                    RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, positionMessage, maxlen,
-                            "position", waitPending));
-                    log.info("Posted [stream={}] position record with id - [{}] for category id - [{}], product id - [{}], sku id - [{}]",
-                            streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
+//                    RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, positionMessage, maxlen,
+//                            "position", waitPending));
+//                    log.info("Posted [stream={}] position record with id - [{}] for category id - [{}], product id - [{}], sku id - [{}]",
+//                            streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
                     PutRecordsRequestEntry awsMessage = getAwsMessage(position.get(), productItemCard.getProductId(), skuId, categoryId);
                     if (awsMessage != null) {
                         entries.add(awsMessage);
@@ -236,10 +236,10 @@ public class PositionJob implements Job {
                             .categoryId(categoryId)
                             .time(Instant.now().toEpochMilli())
                             .build();
-                    RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, positionMessage, maxlen,
-                            "position", waitPending));
-                    log.info("Posted [stream={}] position record with id - [{}], for category id - [{}], product id - [{}], sku id - [{}]",
-                            streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
+//                    RecordId recordId = messagePublisher.publish(new RedisStreamMessage(streamKey, positionMessage, maxlen,
+//                            "position", waitPending));
+//                    log.info("Posted [stream={}] position record with id - [{}], for category id - [{}], product id - [{}], sku id - [{}]",
+//                            streamKey, recordId, categoryId, productItemCard.getProductId(), skuId);
                     PutRecordsRequestEntry awsMessage = getAwsMessage(position.get(), productItemCard.getProductId(), skuId, categoryId);
                     if (awsMessage != null) {
                         entries.add(awsMessage);
@@ -271,6 +271,8 @@ public class PositionJob implements Job {
             PutRecordsRequestEntry requestEntry = new PutRecordsRequestEntry();
             requestEntry.setPartitionKey(productId.toString());
             requestEntry.setData(ByteBuffer.wrap(scrapperEvent.toByteArray()));
+            log.info("POSITION JOB - filling AWS entries for categoryId - [{}] productId - [{}]",
+                    categoryId, productId);
             return requestEntry;
         } catch (Exception ex) {
             log.error("Unexpected exception during publish AWS stream message returning NULL", ex);

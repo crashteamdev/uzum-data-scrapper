@@ -32,7 +32,7 @@ public class SimpleTriggerJobCreatorService {
             JobKey jobKey = new JobKey(name);
             JobDetail jobDetail = JobBuilder.newJob(jobClass)
                     .withIdentity(jobKey).build();
-            jobDetail.getJobDataMap().put(idKey, categoryId);
+            jobDetail.getJobDataMap().put(idKey, String.valueOf(categoryId));
 
             SimpleTriggerFactoryBean factoryBean = new SimpleTriggerFactoryBean();
             factoryBean.setStartTime(new Date());

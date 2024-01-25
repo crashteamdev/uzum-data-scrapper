@@ -6,6 +6,7 @@ spring:
     port: 55000
     password: redispw
   quartz:
+    job-store-type: jdbc
     properties:
       org:
         quartz:
@@ -14,12 +15,19 @@ spring:
             class: org.quartz.simpl.SimpleThreadPool
           jobStore:
             misfireThreshold: 60000
-            class: org.quartz.simpl.RAMJobStore
-#            class: net.joelinn.quartz.jobstore.RedisJobStore
-#            host: 0.0.0.0
-#            port: 55000
-#            password: redispw
-#            ssl: true
+            driverDelegateClass: org.quartz.impl.jdbcjobstore.PostgreSQLDelegate
+            isClustered: true
+            useProperties: true
+    jdbc:
+      initialize-schema: always
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://127.0.0.1:5432/uzum-scrapper
+    username: postgres
+    password: 5053
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 12
 app:
   job:
     cron:

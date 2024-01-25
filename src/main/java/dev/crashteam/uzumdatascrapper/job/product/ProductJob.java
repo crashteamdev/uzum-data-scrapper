@@ -11,19 +11,18 @@ import dev.crashteam.uzumdatascrapper.mapper.UzumProductToMessageMapper;
 import dev.crashteam.uzumdatascrapper.model.Constant;
 import dev.crashteam.uzumdatascrapper.model.dto.UzumProductMessage;
 import dev.crashteam.uzumdatascrapper.model.stream.AwsStreamMessage;
-import dev.crashteam.uzumdatascrapper.model.stream.RedisStreamMessage;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLResponse;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumProduct;
 import dev.crashteam.uzumdatascrapper.service.JobUtilService;
 import dev.crashteam.uzumdatascrapper.service.stream.AwsStreamMessagePublisher;
 import dev.crashteam.uzumdatascrapper.service.stream.RedisStreamMessagePublisher;
+import dev.crashteam.uzumdatascrapper.util.ScrapperUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -127,9 +126,11 @@ public class ProductJob implements Job {
                     });
 
                     try {
-                        PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, entries));
-                        log.info("PRODUCT JOB : Posted [{}] records to AWS stream - [{}] for categoryId - [{}]",
-                                recordsResult.getRecords().size(), streamName, categoryId);
+                        for (List<PutRecordsRequestEntry> batch : ScrapperUtils.getBatches(entries, 50)) {
+                            PutRecordsResult recordsResult = awsStreamMessagePublisher.publish(new AwsStreamMessage(streamName, batch));
+                            log.info("PRODUCT JOB : Posted [{}] records to AWS stream - [{}] for categoryId - [{}]",
+                                    recordsResult.getRecords().size(), streamName, categoryId);
+                        }
                     } catch (Exception e) {
                         log.error("PRODUCT JOB : AWS ERROR, couldn't publish to stream - [{}] for category - [{}]", streamName, categoryId, e);
                     }
@@ -172,10 +173,10 @@ public class ProductJob implements Job {
                 log.warn("Product with id - {} is corrupted", productMessage.getProductId());
                 return null;
             }
-            RecordId recordId = messagePublisher
-                    .publish(new RedisStreamMessage(streamKey, productMessage, maxlen, "item", waitPending));
-            log.info("Posted product record [stream={}] with id - {}, for category id - [{}], product id - [{}]", streamKey,
-                    recordId, categoryId, itemId);
+//            RecordId recordId = messagePublisher
+//                    .publish(new RedisStreamMessage(streamKey, productMessage, maxlen, "item", waitPending));
+//            log.info("Posted product record [stream={}] with id - {}, for category id - [{}], product id - [{}]", streamKey,
+//                    recordId, categoryId, itemId);
 
             return getAwsMessageEntry(productData.getId().toString(), productData);
         };
@@ -198,6 +199,8 @@ public class ProductJob implements Job {
             PutRecordsRequestEntry requestEntry = new PutRecordsRequestEntry();
             requestEntry.setPartitionKey(partitionKey);
             requestEntry.setData(ByteBuffer.wrap(scrapperEvent.toByteArray()));
+            log.info("PRODUCT JOB - filling AWS entries for categoryId - [{}] productId - [{}]",
+                    productData.getCategory().getId(), productData.getId());
             return requestEntry;
         } catch (ProductCorruptedException ex) {
             log.warn("Corrupted product item, ignoring it", ex);
