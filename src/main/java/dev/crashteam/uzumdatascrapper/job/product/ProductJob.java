@@ -11,7 +11,6 @@ import dev.crashteam.uzumdatascrapper.mapper.UzumProductToMessageMapper;
 import dev.crashteam.uzumdatascrapper.model.Constant;
 import dev.crashteam.uzumdatascrapper.model.dto.UzumProductMessage;
 import dev.crashteam.uzumdatascrapper.model.stream.AwsStreamMessage;
-import dev.crashteam.uzumdatascrapper.model.stream.RedisStreamMessage;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLResponse;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumProduct;
 import dev.crashteam.uzumdatascrapper.service.JobUtilService;
@@ -24,7 +23,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.quartz.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
