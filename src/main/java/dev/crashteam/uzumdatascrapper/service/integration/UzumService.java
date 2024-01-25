@@ -160,7 +160,7 @@ public class UzumService {
         Random randomTimeout = new Random();
         ProxyRequestParams requestParams = ProxyRequestParams.builder()
                 .timeout(randomTimeout.nextLong(50L, timeout))
-                .url("https://graphql.uzum.uz/")
+                .url("https://graphql.umarket.uz/")
                 .httpMethod(HttpMethod.POST.name())
                 .context(List.of(headers, content))
                 .build();
