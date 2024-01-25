@@ -1,15 +1,13 @@
 package dev.crashteam.uzumdatascrapper.service.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.crashteam.uzumdatascrapper.exception.CategoryRequestException;
-import dev.crashteam.uzumdatascrapper.exception.ProductRequestException;
 import dev.crashteam.uzumdatascrapper.exception.UzumGqlRequestException;
 import dev.crashteam.uzumdatascrapper.model.ProxyRequestParams;
 import dev.crashteam.uzumdatascrapper.model.StyxProxyResult;
 import dev.crashteam.uzumdatascrapper.model.uzum.*;
+import dev.crashteam.uzumdatascrapper.service.integration.interceptor.AuthHeaderRequestService;
 import dev.crashteam.uzumdatascrapper.util.RandomUserAgent;
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -23,7 +21,6 @@ import org.springframework.util.CollectionUtils;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArraySet;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 @Slf4j
@@ -43,24 +40,27 @@ public class UzumService {
 
     private static final String ROOT_URL = "https://api.umarket.uz/api";
 
-    @SneakyThrows
     public List<UzumCategory.Data> getRootCategories() {
-        return retryTemplate.execute((RetryCallback<List<UzumCategory.Data>, Exception>) retryContext -> {
-            ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
-                    .key("headers")
-                    .value(Map.of("Authorization", authToken,
-                            "User-Agent", RandomUserAgent.getRandomUserAgent())).build();
-            Random randomTimeout = new Random();
-            ProxyRequestParams requestParams = ProxyRequestParams.builder()
-                    .timeout(randomTimeout.nextLong(50L, timeout))
-                    .url(ROOT_URL + "/main/root-categories?eco=false")
-                    .httpMethod(HttpMethod.GET.name())
-                    .context(Collections.singletonList(headers))
-                    .build();
-            StyxProxyResult<UzumCategory> proxyResult = proxyService.getProxyResult(requestParams, new ParameterizedTypeReference<>() {
+        try {
+            return retryTemplate.execute((RetryCallback<List<UzumCategory.Data>, Exception>) retryContext -> {
+                ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
+                        .key("headers")
+                        .value(Map.of("Authorization", authToken,
+                                "User-Agent", RandomUserAgent.getRandomUserAgent())).build();
+                Random randomTimeout = new Random();
+                ProxyRequestParams requestParams = ProxyRequestParams.builder()
+                        .timeout(randomTimeout.nextLong(50L, timeout))
+                        .url(ROOT_URL + "/main/root-categories?eco=false")
+                        .httpMethod(HttpMethod.GET.name())
+                        .context(Collections.singletonList(headers))
+                        .build();
+                StyxProxyResult<UzumCategory> proxyResult = proxyService.getProxyResult(requestParams, new ParameterizedTypeReference<>() {
+                });
+                return proxyResult.getBody().getPayload();
             });
-            return proxyResult.getBody().getPayload();
-        });
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public UzumProduct getProduct(Long id) {
@@ -97,7 +97,6 @@ public class UzumService {
         }).getBody();
     }
 
-    @SneakyThrows
     public Set<Long> getIds() {
         log.info("Collecting category id's...");
         Set<Long> ids = new CopyOnWriteArraySet<>();
@@ -111,15 +110,14 @@ public class UzumService {
         for (Future<Void> future : futures) {
             try {
                 future.get();
-            } catch (ExecutionException e) {
-                throw Optional.ofNullable(e.getCause()).orElse(e);
+            } catch (Exception e) {
+                log.error("Exception while getting id's", e);
             }
         }
         log.info("Collected id's size - {}", ids.size());
         return ids;
     }
 
-    @SneakyThrows
     public UzumGQLResponse getGQLSearchResponse(String categoryId, long offset, long limit) {
         log.info("Starting gql catalog search with values: [categoryId - {}] , [offset - {}], [limit - {}]"
                 , categoryId, offset, limit);
@@ -139,7 +137,13 @@ public class UzumService {
                 .query(query)
                 .build();
         ObjectMapper objectMapper = new ObjectMapper();
-        byte[] bytes = objectMapper.writeValueAsBytes(searchQuery);
+
+        byte[] bytes;
+        try {
+            bytes = objectMapper.writeValueAsBytes(searchQuery);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         String base64Body = Base64.getEncoder().encodeToString(bytes);
         ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
                 .key("headers")
