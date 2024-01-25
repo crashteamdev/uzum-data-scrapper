@@ -1,17 +1,22 @@
 package dev.crashteam.uzumdatascrapper.service.integration.interceptor;
 
+import dev.crashteam.uzumdatascrapper.model.ProxyRequestParams;
+import dev.crashteam.uzumdatascrapper.model.StyxProxyResult;
+import dev.crashteam.uzumdatascrapper.service.integration.StyxProxyService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
-import org.springframework.http.client.ClientHttpRequestExecution;
-import org.springframework.http.client.ClientHttpRequestInterceptor;
-import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Random;
 
+@Service
 @RequiredArgsConstructor
-public class AuthHeaderRequestInterceptor implements ClientHttpRequestInterceptor {
+public class AuthHeaderRequestService {
 
     private final static String AUTH_TOKEN = "UZUM_AUTH_TOKEN";
 
@@ -23,22 +28,18 @@ public class AuthHeaderRequestInterceptor implements ClientHttpRequestIntercepto
 
     private final RestTemplate restTemplate;
 
-    @Override
-    public ClientHttpResponse intercept(
-            HttpRequest request,
-            byte[] body,
-            ClientHttpRequestExecution execution) throws IOException {
+    private final StyxProxyService proxyService;
+
+    public String getCachedToken() {
         String authToken = redisTemplate.opsForValue().get(AUTH_TOKEN);
         boolean isAuthTokenValid = checkAuthToken(authToken);
         if (isAuthTokenValid) {
-            request.getHeaders().add("Authorization", "Bearer %s".formatted(authToken));
+            return "Bearer %s".formatted(authToken);
         } else {
             String newAuthToken = getAuthToken();
             redisTemplate.opsForValue().set(AUTH_TOKEN, newAuthToken);
-            request.getHeaders().add("Authorization", "Bearer %s".formatted(newAuthToken));
+            return "Bearer %s".formatted(newAuthToken);
         }
-
-        return execution.execute(request, body);
     }
 
     private String getAuthToken() {
@@ -48,6 +49,9 @@ public class AuthHeaderRequestInterceptor implements ClientHttpRequestIntercepto
         headers.add("Content-Type", "application/json");
         headers.add("Host", "id.uzum.uz");
         headers.add("Accept-Language", "ru");
+        headers.add("Accept-Encoding", "gzip, deflate, br");
+        headers.add("Connection", "keep-alive");
+
         HttpEntity<String> httpEntity = new HttpEntity<>(headers);
         ResponseEntity<String> responseEntity = restTemplate.exchange(
                 GET_AUTH_TOKEN_URL, HttpMethod.POST, httpEntity, String.class);
@@ -58,13 +62,19 @@ public class AuthHeaderRequestInterceptor implements ClientHttpRequestIntercepto
     }
 
     private boolean checkAuthToken(String authToken) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("Authorization", "Bearer %s".formatted(authToken));
-        HttpEntity<String> httpEntity = new HttpEntity<>(headers);
-        ResponseEntity<String> responseEntity = restTemplate.exchange(
-                CHECK_AUTH_TOKEN_URL, HttpMethod.GET, httpEntity, String.class);
-
-        return responseEntity.getStatusCode() == HttpStatus.OK;
+        ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
+                .key("headers")
+                .value(Map.of("Authorization", "Bearer %s".formatted(authToken))).build();
+        Random randomTimeout = new Random();
+        ProxyRequestParams requestParams = ProxyRequestParams.builder()
+                .timeout(randomTimeout.nextLong(50L, 500L))
+                .url(CHECK_AUTH_TOKEN_URL)
+                .httpMethod(HttpMethod.GET.name())
+                .context(Collections.singletonList(headers))
+                .build();
+        StyxProxyResult<?> proxyResult = proxyService.getProxyResult(requestParams, new ParameterizedTypeReference<>() {
+        });
+        return proxyResult.getOriginalStatus().equals(HttpStatus.OK.value());
     }
 
     private String extractAccessToken(String cookieHeader) {
