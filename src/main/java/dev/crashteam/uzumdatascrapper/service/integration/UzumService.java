@@ -46,6 +46,7 @@ public class UzumService {
                 ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
                         .key("headers")
                         .value(Map.of("Authorization", authToken,
+                                "Accept-Language", "ru-RU",
                                 "User-Agent", RandomUserAgent.getRandomUserAgent())).build();
                 Random randomTimeout = new Random();
                 ProxyRequestParams requestParams = ProxyRequestParams.builder()
@@ -67,6 +68,7 @@ public class UzumService {
         ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
                 .key("headers")
                 .value(Map.of("Authorization", authToken,
+                        "Accept-Language", "ru-RU",
                         "x-iid", "random_uuid()",
                         "User-Agent", RandomUserAgent.getRandomUserAgent())).build();
         Random randomTimeout = new Random();
@@ -85,6 +87,7 @@ public class UzumService {
                 .key("headers")
                 .value(Map.of("Authorization", authToken,
                         "x-iid", "random_uuid()",
+                        "Accept-Language", "ru-RU",
                         "User-Agent", RandomUserAgent.getRandomUserAgent())).build();
         Random randomTimeout = new Random();
         ProxyRequestParams requestParams = ProxyRequestParams.builder()
@@ -148,6 +151,7 @@ public class UzumService {
         ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
                 .key("headers")
                 .value(Map.of("Authorization", authToken,
+                        "Accept-Language", "ru-RU",
                         "x-iid", "random_uuid()",
                         "Content-Type", "application/json",
                         "User-Agent", RandomUserAgent.getRandomUserAgent(),
