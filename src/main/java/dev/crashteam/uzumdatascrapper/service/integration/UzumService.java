@@ -46,8 +46,7 @@ public class UzumService {
                 ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
                         .key("headers")
                         .value(Map.of("Authorization", authToken,
-                                "Accept-Language", "ru-RU",
-                                "User-Agent", RandomUserAgent.getRandomUserAgent())).build();
+                                "Accept-Language", "ru-RU")).build();
                 Random randomTimeout = new Random();
                 ProxyRequestParams requestParams = ProxyRequestParams.builder()
                         .timeout(randomTimeout.nextLong(50L, timeout))
@@ -69,8 +68,7 @@ public class UzumService {
                 .key("headers")
                 .value(Map.of("Authorization", authToken,
                         "Accept-Language", "ru-RU",
-                        "x-iid", "random_uuid()",
-                        "User-Agent", RandomUserAgent.getRandomUserAgent())).build();
+                        "x-iid", "random_uuid()")).build();
         Random randomTimeout = new Random();
         ProxyRequestParams requestParams = ProxyRequestParams.builder()
                 .timeout(randomTimeout.nextLong(50L, timeout))
@@ -87,8 +85,7 @@ public class UzumService {
                 .key("headers")
                 .value(Map.of("Authorization", authToken,
                         "x-iid", "random_uuid()",
-                        "Accept-Language", "ru-RU",
-                        "User-Agent", RandomUserAgent.getRandomUserAgent())).build();
+                        "Accept-Language", "ru-RU")).build();
         Random randomTimeout = new Random();
         ProxyRequestParams requestParams = ProxyRequestParams.builder()
                 .timeout(randomTimeout.nextLong(50L, timeout))
@@ -154,7 +151,6 @@ public class UzumService {
                         "Accept-Language", "ru-RU",
                         "x-iid", "random_uuid()",
                         "Content-Type", "application/json",
-                        "User-Agent", RandomUserAgent.getRandomUserAgent(),
                         "apollographql-client-name", "web-customers",
                         "apollographql-client-version", "1.5.9")).build();
         ProxyRequestParams.ContextValue content = ProxyRequestParams.ContextValue.builder()
