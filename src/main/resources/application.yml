@@ -61,7 +61,9 @@ app:
       maxlen: 50000
       waitPending: 0
   integration:
-    timeout: 600
+    timeout:
+      from: 500
+      to: 1500
     uzum:
       token:
     styx:

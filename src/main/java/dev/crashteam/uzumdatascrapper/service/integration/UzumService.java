@@ -35,7 +35,10 @@ public class UzumService {
     @Value("${app.integration.uzum.token}")
     private String authToken;
 
-    @Value("${app.integration.timeout}")
+    @Value("${app.integration.timeout.from}")
+    private Long fromTimeout;
+
+    @Value("${app.integration.timeout.to}")
     private Long timeout;
 
     private static final String ROOT_URL = "https://api.umarket.uz/api";
@@ -49,11 +52,11 @@ public class UzumService {
                                 "Accept-Language", "ru-RU")).build();
                 Random randomTimeout = new Random();
                 ProxyRequestParams requestParams = ProxyRequestParams.builder()
-                        .timeout(randomTimeout.nextLong(50L, timeout))
                         .url(ROOT_URL + "/main/root-categories?eco=false")
                         .httpMethod(HttpMethod.GET.name())
                         .context(Collections.singletonList(headers))
                         .build();
+                Thread.sleep(randomTimeout.nextLong(fromTimeout, timeout));
                 StyxProxyResult<UzumCategory> proxyResult = proxyService.getProxyResult(requestParams, new ParameterizedTypeReference<>() {
                 });
                 return proxyResult.getBody().getPayload();
@@ -71,11 +74,15 @@ public class UzumService {
                         "x-iid", "random_uuid()")).build();
         Random randomTimeout = new Random();
         ProxyRequestParams requestParams = ProxyRequestParams.builder()
-                .timeout(randomTimeout.nextLong(50L, timeout))
                 .url(ROOT_URL + "/v2/product/%s".formatted(id))
                 .httpMethod(HttpMethod.GET.name())
                 .context(Collections.singletonList(headers))
                 .build();
+        try {
+            Thread.sleep(randomTimeout.nextLong(fromTimeout, timeout));
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         return proxyService.getProxyResult(requestParams, new ParameterizedTypeReference<StyxProxyResult<UzumProduct>>() {
         }).getBody();
     }
@@ -88,11 +95,15 @@ public class UzumService {
                         "Accept-Language", "ru-RU")).build();
         Random randomTimeout = new Random();
         ProxyRequestParams requestParams = ProxyRequestParams.builder()
-                .timeout(randomTimeout.nextLong(50L, timeout))
                 .url(ROOT_URL + "/category/v2/%s".formatted(id))
                 .httpMethod(HttpMethod.GET.name())
                 .context(Collections.singletonList(headers))
                 .build();
+        try {
+            Thread.sleep(randomTimeout.nextLong(fromTimeout, timeout));
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         return proxyService.getProxyResult(requestParams, new ParameterizedTypeReference<StyxProxyResult<UzumCategoryChild>>() {
         }).getBody();
     }
@@ -159,11 +170,15 @@ public class UzumService {
                 .build();
         Random randomTimeout = new Random();
         ProxyRequestParams requestParams = ProxyRequestParams.builder()
-                .timeout(randomTimeout.nextLong(50L, timeout))
                 .url("https://graphql.umarket.uz/")
                 .httpMethod(HttpMethod.POST.name())
                 .context(List.of(headers, content))
                 .build();
+        try {
+            Thread.sleep(randomTimeout.nextLong(fromTimeout, timeout));
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         return proxyService
                 .getProxyResult(requestParams, new ParameterizedTypeReference<StyxProxyResult<UzumGQLResponse>>() {
                 }).getBody();
