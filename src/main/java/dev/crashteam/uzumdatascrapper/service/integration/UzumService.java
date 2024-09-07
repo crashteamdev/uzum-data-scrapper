@@ -41,7 +41,7 @@ public class UzumService {
     @Value("${app.integration.timeout.to}")
     private Long timeout;
 
-    private static final String ROOT_URL = "https://api.umarket.uz/api";
+    private static final String ROOT_URL = "https://api.uzum.uz/api";
 
     public List<UzumCategory.Data> getRootCategories() {
         try {
@@ -170,7 +170,7 @@ public class UzumService {
                 .build();
         Random randomTimeout = new Random();
         ProxyRequestParams requestParams = ProxyRequestParams.builder()
-                .url("https://graphql.umarket.uz/")
+                .url("https://graphql.uzum.uz/")
                 .httpMethod(HttpMethod.POST.name())
                 .context(List.of(headers, content))
                 .build();
