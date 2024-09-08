@@ -2,12 +2,15 @@ package dev.crashteam.uzumdatascrapper.service;
 
 import dev.crashteam.uzumdatascrapper.exception.ProductRequestException;
 import dev.crashteam.uzumdatascrapper.exception.UzumGqlRequestException;
+import dev.crashteam.uzumdatascrapper.mapper.UzumProductToCachedProduct;
+import dev.crashteam.uzumdatascrapper.model.cache.CachedProductData;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLResponse;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumProduct;
 import dev.crashteam.uzumdatascrapper.service.integration.UzumService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.JobExecutionContext;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.retry.RetryCallback;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
@@ -62,5 +65,10 @@ public class JobUtilService {
             }
             return response;
         });
+    }
+
+    @Cacheable(value = "productCache")
+    public CachedProductData getCachedProductData(Long itemId) {
+        return UzumProductToCachedProduct.toCachedData(getProductData(itemId));
     }
 }

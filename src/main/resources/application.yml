@@ -67,3 +67,6 @@ app:
     uzum:
       token:
     styx:
+
+redis:
+  local: false

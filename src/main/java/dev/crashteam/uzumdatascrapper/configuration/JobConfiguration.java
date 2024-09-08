@@ -1,5 +1,6 @@
 package dev.crashteam.uzumdatascrapper.configuration;
 
+import dev.crashteam.uzumdatascrapper.job.CacheHandler;
 import dev.crashteam.uzumdatascrapper.job.category.CategoryJob;
 import dev.crashteam.uzumdatascrapper.job.position.PositionMasterJob;
 import dev.crashteam.uzumdatascrapper.job.product.ProductMasterJob;
@@ -36,6 +37,9 @@ public class JobConfiguration {
     @Value("${app.job.cron.position-product-job}")
     private String positionProductJobCron;
 
+    @Value("${app.job.cron.delete-product-cache}")
+    private String deleteProductCache;
+
     @PostConstruct
     public void init() {
         scheduleJob(new JobModel(Constant.PRODUCT_MASTER_JOB_NAME, ProductMasterJob.class, productJobCron,
@@ -44,6 +48,8 @@ public class JobConfiguration {
                 Constant.POSITION_MASTER_JOB_TRIGGER, Constant.MASTER_JOB_GROUP));
         scheduleJob(new JobModel(Constant.CATEGORY_MASTER_JOB_NAME, CategoryJob.class, categoryJobCron,
                 Constant.CATEGORY_MASTER_JOB_TRIGGER, Constant.MASTER_JOB_GROUP));
+        scheduleJob(new JobModel(Constant.DELETE_PRODUCT_CACHE_JOB_NAME, CacheHandler.class, deleteProductCache,
+                Constant.DELETE_PRODUCT_CACHE_TRIGGER_NAME, "cache"));
     }
 
     private void scheduleJob(JobModel jobModel) {

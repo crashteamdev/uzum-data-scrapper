@@ -14,6 +14,7 @@ import dev.crashteam.uzumdatascrapper.model.stream.AwsStreamMessage;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLResponse;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumProduct;
 import dev.crashteam.uzumdatascrapper.service.JobUtilService;
+import dev.crashteam.uzumdatascrapper.service.ProductDataService;
 import dev.crashteam.uzumdatascrapper.service.stream.AwsStreamMessagePublisher;
 import dev.crashteam.uzumdatascrapper.service.stream.RedisStreamMessagePublisher;
 import dev.crashteam.uzumdatascrapper.util.ScrapperUtils;
@@ -57,6 +58,9 @@ public class ProductJob implements Job {
 
     @Autowired
     UzumProductToMessageMapper messageMapper;
+
+    @Autowired
+    ProductDataService productDataService;
 
     @Value("${app.aws-stream.uzum-stream.name}")
     public String streamName;
@@ -112,7 +116,11 @@ public class ProductJob implements Job {
                     List<Callable<PutRecordsRequestEntry>> callables = new ArrayList<>();
                     List<PutRecordsRequestEntry> entries = new ArrayList<>();
                     for (UzumGQLResponse.CatalogCardWrapper productItem : productItems) {
-                        callables.add(postProductRecord(productItem, categoryId));
+                        Long productId = Optional.ofNullable(productItem.getCatalogCard()).map(UzumGQLResponse.CatalogCard::getProductId).orElse(null);
+                        if (productId == null) continue;
+                        if (productDataService.save(productId)) {
+                            callables.add(postProductRecord(productItem, categoryId));
+                        }
                     }
                     List<Future<PutRecordsRequestEntry>> futures = jobExecutor.invokeAll(callables);
                     futures.forEach(it -> {

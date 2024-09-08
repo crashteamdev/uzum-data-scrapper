@@ -8,9 +8,9 @@ import dev.crashteam.uzum.scrapper.data.v1.UzumProductCategoryPositionChange;
 import dev.crashteam.uzum.scrapper.data.v1.UzumScrapperEvent;
 import dev.crashteam.uzumdatascrapper.exception.UzumGqlRequestException;
 import dev.crashteam.uzumdatascrapper.model.Constant;
+import dev.crashteam.uzumdatascrapper.model.cache.CachedProductData;
 import dev.crashteam.uzumdatascrapper.model.dto.ProductPositionMessage;
 import dev.crashteam.uzumdatascrapper.model.stream.AwsStreamMessage;
-import dev.crashteam.uzumdatascrapper.model.stream.RedisStreamMessage;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLResponse;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumProduct;
 import dev.crashteam.uzumdatascrapper.service.JobUtilService;
@@ -22,7 +22,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.quartz.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -82,6 +81,11 @@ public class PositionJob implements Job {
         AtomicLong position = new AtomicLong(0);
         try {
             while (true) {
+                if (offset.get() >= 4500) {
+                    log.info("Total offset - [{}] of category - [{}], " +
+                            "skipping further parsing... ", offset.get(), categoryId);
+                    break;
+                }
                 try {
                     UzumGQLResponse gqlResponse = jobUtilService.getResponse(jobExecutionContext, offset, categoryId, limit);
                     if (gqlResponse == null || !CollectionUtils.isEmpty(gqlResponse.getErrors())) {
@@ -163,7 +167,7 @@ public class PositionJob implements Job {
                     .orElseThrow(() -> new UzumGqlRequestException("Catalog card can't be null"));
             UzumGQLResponse.CatalogCard productItemCard = productItem.getCatalogCard();
             List<UzumGQLResponse.CharacteristicValue> productItemCardCharacteristics = productItemCard.getCharacteristicValues();
-            UzumProduct.ProductData productResponse = jobUtilService.getProductData(itemId);
+            CachedProductData productResponse = jobUtilService.getCachedProductData(itemId);
             if (productResponse == null) {
                 log.info("Product data with id - %s returned null, continue with next item, if it exists...".formatted(itemId));
                 return null;

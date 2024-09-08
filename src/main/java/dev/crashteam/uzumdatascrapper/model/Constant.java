@@ -21,4 +21,7 @@ public class Constant {
     public static final String POSITION_MASTER_JOB_NAME = "position-master-job";
     public static final String CATEGORY_MASTER_JOB_NAME = "category-master-job";
 
+    public static final String DELETE_PRODUCT_CACHE_JOB_NAME = "delete-product-cache-job";
+    public static final String DELETE_PRODUCT_CACHE_TRIGGER_NAME = "delete-product-cache-trigger";
+
 }
