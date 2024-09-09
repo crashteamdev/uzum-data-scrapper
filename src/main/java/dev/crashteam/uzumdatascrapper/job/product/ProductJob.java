@@ -65,7 +65,7 @@ public class ProductJob implements Job {
     @Value("${app.aws-stream.uzum-stream.name}")
     public String streamName;
 
-    ExecutorService jobExecutor = Executors.newWorkStealingPool(3);
+    ExecutorService jobExecutor = Executors.newWorkStealingPool(2);
 
     @Value("${app.stream.product.key}")
     public String streamKey;

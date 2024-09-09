@@ -36,6 +36,7 @@ app:
       position-job: 0 0 4 ? * * *
       category-job: 0 0 1 ? * * *
       trim-job: 0 0/60 * * * ?
+      token-job: 0/10 * * * * ?
   aws-stream:
     endpoint: 'yds.serverless.yandexcloud.net'
     accessKey: fake-access-key
@@ -62,8 +63,8 @@ app:
       waitPending: 0
   integration:
     timeout:
-      from: 500
-      to: 1500
+      from: 3500
+      to: 5000
     uzum:
       token:
     styx:

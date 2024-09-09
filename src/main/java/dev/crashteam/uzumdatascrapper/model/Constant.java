@@ -24,4 +24,7 @@ public class Constant {
     public static final String DELETE_PRODUCT_CACHE_JOB_NAME = "delete-product-cache-job";
     public static final String DELETE_PRODUCT_CACHE_TRIGGER_NAME = "delete-product-cache-trigger";
 
+    public static final String TOKEN_CACHE_JOB_NAME = "token-cache-job";
+    public static final String TOKEN_CACHE_TRIGGER_NAME = "token-cache-trigger";
+
 }

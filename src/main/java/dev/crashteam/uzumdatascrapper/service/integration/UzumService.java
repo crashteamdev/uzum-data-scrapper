@@ -31,9 +31,7 @@ public class UzumService {
     private final StyxProxyService proxyService;
     private final ThreadPoolTaskExecutor taskExecutor;
     private final RetryTemplate retryTemplate;
-
-    @Value("${app.integration.uzum.token}")
-    private String authToken;
+    private final AuthHeaderRequestService headerRequestService;
 
     @Value("${app.integration.timeout.from}")
     private Long fromTimeout;
@@ -48,13 +46,16 @@ public class UzumService {
             return retryTemplate.execute((RetryCallback<List<UzumCategory.Data>, Exception>) retryContext -> {
                 ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
                         .key("headers")
-                        .value(Map.of("Authorization", authToken,
+                        .value(Map.of("Authorization", headerRequestService.getCachedToken(),
                                 "Accept-Language", "ru-RU")).build();
+                ProxyRequestParams.ContextValue market = ProxyRequestParams.ContextValue.builder()
+                        .key("market")
+                        .value("UZUM").build();
                 Random randomTimeout = new Random();
                 ProxyRequestParams requestParams = ProxyRequestParams.builder()
                         .url(ROOT_URL + "/main/root-categories?eco=false")
                         .httpMethod(HttpMethod.GET.name())
-                        .context(Collections.singletonList(headers))
+                        .context(List.of(headers, market))
                         .build();
                 Thread.sleep(randomTimeout.nextLong(fromTimeout, timeout));
                 StyxProxyResult<UzumCategory> proxyResult = proxyService.getProxyResult(requestParams, new ParameterizedTypeReference<>() {
@@ -69,14 +70,17 @@ public class UzumService {
     public UzumProduct getProduct(Long id) {
         ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
                 .key("headers")
-                .value(Map.of("Authorization", authToken,
+                .value(Map.of("Authorization", headerRequestService.getCachedToken(),
                         "Accept-Language", "ru-RU",
                         "x-iid", "random_uuid()")).build();
+        ProxyRequestParams.ContextValue market = ProxyRequestParams.ContextValue.builder()
+                .key("market")
+                .value("UZUM").build();
         Random randomTimeout = new Random();
         ProxyRequestParams requestParams = ProxyRequestParams.builder()
                 .url(ROOT_URL + "/v2/product/%s".formatted(id))
                 .httpMethod(HttpMethod.GET.name())
-                .context(Collections.singletonList(headers))
+                .context(List.of(headers, market))
                 .build();
         try {
             Thread.sleep(randomTimeout.nextLong(fromTimeout, timeout));
@@ -90,7 +94,7 @@ public class UzumService {
     public UzumCategoryChild getCategoryData(Long id) {
         ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
                 .key("headers")
-                .value(Map.of("Authorization", authToken,
+                .value(Map.of("Authorization", headerRequestService.getCachedToken(),
                         "x-iid", "random_uuid()",
                         "Accept-Language", "ru-RU")).build();
         Random randomTimeout = new Random();
@@ -158,12 +162,15 @@ public class UzumService {
         String base64Body = Base64.getEncoder().encodeToString(bytes);
         ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
                 .key("headers")
-                .value(Map.of("Authorization", authToken,
+                .value(Map.of("Authorization", headerRequestService.getCachedToken(),
                         "Accept-Language", "ru-RU",
                         "x-iid", "random_uuid()",
                         "Content-Type", "application/json",
                         "apollographql-client-name", "web-customers",
-                        "apollographql-client-version", "1.5.9")).build();
+                        "apollographql-client-version", "1.31.0")).build();
+        ProxyRequestParams.ContextValue market = ProxyRequestParams.ContextValue.builder()
+                .key("market")
+                .value("UZUM").build();
         ProxyRequestParams.ContextValue content = ProxyRequestParams.ContextValue.builder()
                 .key("content")
                 .value(base64Body)
@@ -172,7 +179,7 @@ public class UzumService {
         ProxyRequestParams requestParams = ProxyRequestParams.builder()
                 .url("https://graphql.uzum.uz/")
                 .httpMethod(HttpMethod.POST.name())
-                .context(List.of(headers, content))
+                .context(List.of(headers, content, market))
                 .build();
         try {
             Thread.sleep(randomTimeout.nextLong(fromTimeout, timeout));

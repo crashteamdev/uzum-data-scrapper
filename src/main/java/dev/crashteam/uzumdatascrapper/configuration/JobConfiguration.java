@@ -1,5 +1,6 @@
 package dev.crashteam.uzumdatascrapper.configuration;
 
+import dev.crashteam.uzumdatascrapper.job.AuthTokenHandlerJob;
 import dev.crashteam.uzumdatascrapper.job.CacheHandler;
 import dev.crashteam.uzumdatascrapper.job.category.CategoryJob;
 import dev.crashteam.uzumdatascrapper.job.position.PositionMasterJob;
@@ -40,6 +41,9 @@ public class JobConfiguration {
     @Value("${app.job.cron.delete-product-cache}")
     private String deleteProductCache;
 
+    @Value("${app.job.cron.token-job}")
+    private String tokenCacheCron;
+
     @PostConstruct
     public void init() {
         scheduleJob(new JobModel(Constant.PRODUCT_MASTER_JOB_NAME, ProductMasterJob.class, productJobCron,
@@ -50,6 +54,8 @@ public class JobConfiguration {
                 Constant.CATEGORY_MASTER_JOB_TRIGGER, Constant.MASTER_JOB_GROUP));
         scheduleJob(new JobModel(Constant.DELETE_PRODUCT_CACHE_JOB_NAME, CacheHandler.class, deleteProductCache,
                 Constant.DELETE_PRODUCT_CACHE_TRIGGER_NAME, "cache"));
+        scheduleJob(new JobModel(Constant.TOKEN_CACHE_JOB_NAME, AuthTokenHandlerJob.class, tokenCacheCron,
+                Constant.TOKEN_CACHE_TRIGGER_NAME, "token"));
     }
 
     private void scheduleJob(JobModel jobModel) {
