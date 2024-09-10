@@ -67,7 +67,7 @@ public class JobUtilService {
         });
     }
 
-    @Cacheable(value = "productCache")
+    @Cacheable(value = "uzumProductCache")
     public CachedProductData getCachedProductData(Long itemId) {
         return UzumProductToCachedProduct.toCachedData(getProductData(itemId));
     }

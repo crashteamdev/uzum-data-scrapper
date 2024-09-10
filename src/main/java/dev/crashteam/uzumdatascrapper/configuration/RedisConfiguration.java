@@ -61,7 +61,7 @@ public class RedisConfiguration {
     @Bean
     public RedisCacheManagerBuilderCustomizer redisCacheManagerBuilderCustomizer() {
         return builder -> builder
-                .withCacheConfiguration("productCache",
+                .withCacheConfiguration("uzumProductCache",
                         RedisCacheConfiguration.defaultCacheConfig()
                                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()))
                                 .entryTtl(Duration.ofHours(5)));
