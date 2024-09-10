@@ -18,6 +18,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
+import javax.annotation.PostConstruct;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -88,6 +89,64 @@ public class UzumService {
             throw new RuntimeException(e);
         }
         return proxyService.getProxyResult(requestParams, new ParameterizedTypeReference<StyxProxyResult<UzumProduct>>() {
+        }).getBody();
+    }
+
+    public UzumGQLProductResponse getGQLProduct(Long id) {
+        ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
+                .key("headers")
+                .value(Map.of("Authorization", headerRequestService.getCachedToken(),
+                        "Accept-Language", "ru-RU",
+                        "x-iid", "random_uuid()",
+                        "Content-Type", "application/json",
+                        "apollographql-client-name", "web-customers",
+                        "apollographql-client-version", "1.31.0")).build();
+        ProxyRequestParams.ContextValue market = ProxyRequestParams.ContextValue.builder()
+                .key("market")
+                .value("UZUM").build();
+
+        String query = "query ProductPage($productId: Int!, $linkTrans4: Transformation!, $linkTrans6: Transformation!, $linkTrans5: Transformation!, $linkTrans7: Transformation!) {\n  productPage(id: $productId) {\n    product {\n      id\n      ordersQuantity\n      feedbackQuantity\n      feedbackPhotosCount\n      photo360 {\n        key\n        link(trans: PRODUCT_720) {\n          high\n          low\n          __typename\n        }\n        __typename\n      }\n      photos {\n        key\n        link(trans: PRODUCT_720) {\n          high\n          low\n          __typename\n        }\n        __typename\n      }\n      rating\n      video {\n        key\n        url\n        __typename\n      }\n      title\n      category {\n        id\n        parentList {\n          id\n          title\n          __typename\n        }\n        title\n        __typename\n      }\n      minFullPrice\n      minSellPrice\n      characteristics {\n        id\n        title\n        type\n        values {\n          id\n          photo {\n            key\n            link(trans: PRODUCT_240) {\n              high\n              low\n              __typename\n            }\n            __typename\n          }\n          title\n          value\n          characteristic {\n            id\n            title\n            type\n            values {\n              id\n              photo {\n                link(trans: $linkTrans7) {\n                  high\n                  low\n                  __typename\n                }\n                key\n                __typename\n              }\n              title\n              value\n              __typename\n            }\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      badges {\n        ... on BottomIconTextBadge {\n          backgroundColor\n          description\n          iconLink\n          id\n          link\n          text\n          textColor\n          __typename\n        }\n        ... on BottomTextBadge {\n          backgroundColor\n          description\n          id\n          link\n          text\n          textColor\n          __typename\n        }\n        ... on TopTextBadge {\n          backgroundColor\n          id\n          text\n          textColor\n          __typename\n        }\n        __typename\n      }\n      description\n      favorite\n      shop {\n        avatar {\n          low\n          __typename\n        }\n        feedbackQuantity\n        id\n        official\n        ordersQuantity\n        rating\n        seller {\n          accountId\n          legalRecords {\n            name\n            value\n            __typename\n          }\n          __typename\n        }\n        shortTitle\n        title\n        url\n        __typename\n      }\n      shortDescription\n      skuList {\n        id\n        availableAmount\n        photo {\n          key\n          link(trans: $linkTrans4) {\n            low\n            __typename\n          }\n          __typename\n        }\n        paymentOptions {\n          paymentPerMonth\n          paymentInfo\n          text\n          type\n          id\n          active\n          __typename\n        }\n        skuTitle\n        sellPrice\n        discount {\n          discountPrice\n          discountAmount\n          priceText\n          modalHeader\n          modalText\n          __typename\n        }\n        properties {\n          description\n          filter {\n            description\n            id\n            measurementUnit\n            title\n            type\n            __typename\n          }\n          id\n          image\n          name\n          __typename\n        }\n        discountBadge {\n          backgroundColor\n          id\n          text\n          textColor\n          __typename\n        }\n        characteristicValues {\n          id\n          photo {\n            key\n            link(trans: $linkTrans6) {\n              low\n              __typename\n            }\n            __typename\n          }\n          title\n          value\n          characteristic {\n            id\n            title\n            type\n            values {\n              id\n              photo {\n                key\n                link(trans: $linkTrans5) {\n                  high\n                  low\n                  __typename\n                }\n                __typename\n              }\n              title\n              value\n              __typename\n            }\n            __typename\n          }\n          __typename\n        }\n        fullPrice\n        vat {\n          vatRate\n          vatAmount\n          type\n          price\n          __typename\n        }\n        discountTimer {\n          endDate\n          text\n          textColor\n          __typename\n        }\n        __typename\n      }\n      attributes\n      __typename\n    }\n    fastDeliveryInfo {\n      title\n      __typename\n    }\n    actions {\n      location\n      type\n      ... on MotivationAction {\n        image {\n          low\n          high\n          __typename\n        }\n        location\n        text\n        type\n        __typename\n      }\n      ... on WishSaleAction {\n        dateEnd\n        location\n        pressed\n        pressedCount\n        type\n        __typename\n      }\n      __typename\n    }\n    installmentWidget {\n      title\n      titleColor\n      subtitle\n      subtitleColor\n      icon\n      link\n      lockedIcon\n      userStatus\n      __typename\n    }\n    __typename\n  }\n}";
+
+        UzumSearchQuery.Variables variables = UzumSearchQuery.Variables.builder()
+                .productId(id)
+                .linkTrans4("PRODUCT_240")
+                .linkTrans5("PRODUCT_240")
+                .linkTrans6("PRODUCT_240")
+                .linkTrans7("PRODUCT_240")
+                .build();
+        UzumSearchQuery searchQuery = UzumSearchQuery.builder()
+                .operationName("ProductPage")
+                .variables(variables)
+                .query(query)
+                .build();
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        byte[] bytes;
+        try {
+            bytes = objectMapper.writeValueAsBytes(searchQuery);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        String base64Body = Base64.getEncoder().encodeToString(bytes);
+
+        Random randomTimeout = new Random();
+        ProxyRequestParams.ContextValue content = ProxyRequestParams.ContextValue.builder()
+                .key("content")
+                .value(base64Body)
+                .build();
+
+        ProxyRequestParams requestParams = ProxyRequestParams.builder()
+                .url("https://graphql.uzum.uz/")
+                .httpMethod(HttpMethod.POST.name())
+                .context(List.of(headers, content, market))
+                .build();
+
+        try {
+            Thread.sleep(randomTimeout.nextLong(fromTimeout, timeout));
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        return proxyService.getProxyResult(requestParams, new ParameterizedTypeReference<StyxProxyResult<UzumGQLProductResponse>>() {
         }).getBody();
     }
 

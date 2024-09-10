@@ -7,10 +7,12 @@ import com.google.protobuf.Timestamp;
 import dev.crashteam.uzum.scrapper.data.v1.UzumProductChange;
 import dev.crashteam.uzum.scrapper.data.v1.UzumScrapperEvent;
 import dev.crashteam.uzumdatascrapper.mapper.ProductCorruptedException;
+import dev.crashteam.uzumdatascrapper.mapper.UzumGQLProductResponseToMessageMapper;
 import dev.crashteam.uzumdatascrapper.mapper.UzumProductToMessageMapper;
 import dev.crashteam.uzumdatascrapper.model.Constant;
 import dev.crashteam.uzumdatascrapper.model.dto.UzumProductMessage;
 import dev.crashteam.uzumdatascrapper.model.stream.AwsStreamMessage;
+import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLProductResponse;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLResponse;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumProduct;
 import dev.crashteam.uzumdatascrapper.service.JobUtilService;
@@ -57,15 +59,12 @@ public class ProductJob implements Job {
     AwsStreamMessagePublisher awsStreamMessagePublisher;
 
     @Autowired
-    UzumProductToMessageMapper messageMapper;
-
-    @Autowired
     ProductDataService productDataService;
 
     @Value("${app.aws-stream.uzum-stream.name}")
     public String streamName;
 
-    ExecutorService jobExecutor = Executors.newWorkStealingPool(2);
+    ExecutorService jobExecutor = Executors.newWorkStealingPool(3);
 
     @Value("${app.stream.product.key}")
     public String streamKey;
@@ -169,31 +168,19 @@ public class ProductJob implements Job {
                 log.warn("Product id is null continue with next item, if it exists...");
                 return null;
             }
-            UzumProduct.ProductData productData = jobUtilService.getProductData(itemId);
-
+            UzumGQLProductResponse.Product productData = jobUtilService.getGQLProductData(itemId);
             if (productData == null) {
                 log.warn("Product data with id - {} returned null, continue with next item, if it exists...", itemId);
                 return null;
             }
-
-            UzumProductMessage productMessage = messageMapper.productToMessage(productData);
-            if (productMessage.isCorrupted()) {
-                log.warn("Product with id - {} is corrupted", productMessage.getProductId());
-                return null;
-            }
-//            RecordId recordId = messagePublisher
-//                    .publish(new RedisStreamMessage(streamKey, productMessage, maxlen, "item", waitPending));
-//            log.info("Posted product record [stream={}] with id - {}, for category id - [{}], product id - [{}]", streamKey,
-//                    recordId, categoryId, itemId);
-
-            return getAwsMessageEntry(productData.getId().toString(), productData);
+            return getAwsMessageEntry(String.valueOf(productData.getId()), productData);
         };
     }
 
-    private PutRecordsRequestEntry getAwsMessageEntry(String partitionKey, UzumProduct.ProductData productData) {
+    private PutRecordsRequestEntry getAwsMessageEntry(String partitionKey, UzumGQLProductResponse.Product productData) {
         try {
             Instant now = Instant.now();
-            UzumProductChange uzumProductChange = messageMapper.mapToMessage(productData);
+            UzumProductChange uzumProductChange = UzumGQLProductResponseToMessageMapper.mapToProtobuf(productData);
             UzumScrapperEvent scrapperEvent = UzumScrapperEvent.newBuilder()
                     .setEventId(UUID.randomUUID().toString())
                     .setScrapTime(Timestamp.newBuilder()

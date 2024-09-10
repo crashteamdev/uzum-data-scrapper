@@ -1,5 +1,6 @@
 package dev.crashteam.uzumdatascrapper.model.uzum;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 import lombok.Data;
 
@@ -15,8 +16,15 @@ public class UzumSearchQuery {
 
     @Data
     @Builder
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Variables {
         private QueryInput queryInput;
+        private Long productId;
+        private String linkTrans4;
+        private String linkTrans5;
+        private String linkTrans6;
+        private String linkTrans7;
+
     }
 
     @Data
