@@ -1,6 +1,7 @@
 
 package dev.crashteam.uzumdatascrapper.mapper;
 
+import com.google.protobuf.Timestamp;
 import dev.crashteam.uzum.scrapper.data.v1.UzumProductChange;
 import dev.crashteam.uzum.scrapper.data.v1.UzumSkuCharacteristic;
 import dev.crashteam.uzum.scrapper.data.v1.UzumValue;
@@ -67,6 +68,7 @@ public class UzumGQLProductResponseToMessageMapper {
             sellerBuilder.setReviews(shop.getFeedbackQuantity());
             sellerBuilder.setOrders(shop.getOrdersQuantity());
             sellerBuilder.setRating(String.valueOf(shop.getRating()));
+            sellerBuilder.setRegistrationDate(Timestamp.newBuilder().build());
 
             sellerBuilder.addContacts(UzumProductChange.UzumProductContact.newBuilder().build());
 
