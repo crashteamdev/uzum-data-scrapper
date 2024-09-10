@@ -7,6 +7,8 @@ import dev.crashteam.uzum.scrapper.data.v1.UzumSkuCharacteristic;
 import dev.crashteam.uzum.scrapper.data.v1.UzumValue;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLProductResponse;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -68,7 +70,8 @@ public class UzumGQLProductResponseToMessageMapper {
             sellerBuilder.setReviews(shop.getFeedbackQuantity());
             sellerBuilder.setOrders(shop.getOrdersQuantity());
             sellerBuilder.setRating(String.valueOf(shop.getRating()));
-            sellerBuilder.setRegistrationDate(Timestamp.newBuilder().build());
+            long date = LocalDateTime.MIN.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+            sellerBuilder.setRegistrationDate(Timestamp.newBuilder().setSeconds(date));
 
             sellerBuilder.addContacts(UzumProductChange.UzumProductContact.newBuilder().build());
 
