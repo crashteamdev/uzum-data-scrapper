@@ -7,10 +7,13 @@ import dev.crashteam.uzum.scrapper.data.v1.UzumSkuCharacteristic;
 import dev.crashteam.uzum.scrapper.data.v1.UzumValue;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLProductResponse;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import static java.time.temporal.TemporalAdjusters.firstDayOfYear;
 
 public class UzumGQLProductResponseToMessageMapper {
 
@@ -70,8 +73,11 @@ public class UzumGQLProductResponseToMessageMapper {
             sellerBuilder.setReviews(shop.getFeedbackQuantity());
             sellerBuilder.setOrders(shop.getOrdersQuantity());
             sellerBuilder.setRating(String.valueOf(shop.getRating()));
-            long date = LocalDateTime.MIN.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-            sellerBuilder.setRegistrationDate(Timestamp.newBuilder().setSeconds(date));
+            LocalDate now = LocalDate.now();
+            LocalDate firstDay = now.with(firstDayOfYear());
+            long epoch = firstDay.atStartOfDay(ZoneId.systemDefault()).toEpochSecond();
+
+            sellerBuilder.setRegistrationDate(Timestamp.newBuilder().setSeconds(epoch));
 
             sellerBuilder.addContacts(UzumProductChange.UzumProductContact.newBuilder().build());
 
