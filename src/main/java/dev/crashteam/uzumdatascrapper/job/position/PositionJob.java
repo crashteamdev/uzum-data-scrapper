@@ -81,7 +81,7 @@ public class PositionJob implements Job {
         AtomicLong position = new AtomicLong(0);
         try {
             while (true) {
-                if (offset.get() >= 4500) {
+                if (offset.get() >= 1500) {
                     log.info("Total offset - [{}] of category - [{}], " +
                             "skipping further parsing... ", offset.get(), categoryId);
                     break;
