@@ -5,14 +5,12 @@ import dev.crashteam.uzumdatascrapper.model.StyxProxyResult;
 import dev.crashteam.uzumdatascrapper.service.integration.StyxProxyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.quartz.DisallowConcurrentExecution;
-import org.quartz.Job;
-import org.quartz.JobExecutionContext;
-import org.quartz.JobExecutionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -21,9 +19,8 @@ import java.util.Map;
 
 @Slf4j
 @Component
-@DisallowConcurrentExecution
 @RequiredArgsConstructor
-public class AuthTokenHandlerJob implements Job {
+public class AuthTokenHandlerJob {
 
     private final static String AUTH_TOKEN = "UZUM_AUTH_TOKEN";
 
@@ -40,8 +37,9 @@ public class AuthTokenHandlerJob implements Job {
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
 
-    @Override
-    public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
+    @Async
+    @Scheduled(cron = "${app.job.cron.token-job}")
+    public void execute()  {
         String authToken = redisTemplate.opsForValue().get(AUTH_TOKEN);
         boolean isAuthTokenValid = checkAuthToken(authToken);
         if (isAuthTokenValid) {
