@@ -61,6 +61,9 @@ public class ProductJob implements Job {
     @Autowired
     ProductDataService productDataService;
 
+    @Autowired
+    UzumProductToMessageMapper uzumProductToMessageMapper;
+
     @Value("${app.aws-stream.uzum-stream.name}")
     public String streamName;
 
@@ -168,7 +171,7 @@ public class ProductJob implements Job {
                 log.warn("Product id is null continue with next item, if it exists...");
                 return null;
             }
-            UzumGQLProductResponse.Product productData = jobUtilService.getGQLProductData(itemId);
+            var productData = jobUtilService.getProductData(itemId);
             if (productData == null) {
                 log.warn("Product data with id - {} returned null, continue with next item, if it exists...", itemId);
                 return null;
@@ -177,10 +180,10 @@ public class ProductJob implements Job {
         };
     }
 
-    private PutRecordsRequestEntry getAwsMessageEntry(String partitionKey, UzumGQLProductResponse.Product productData) {
+    private PutRecordsRequestEntry getAwsMessageEntry(String partitionKey, UzumProduct.ProductData productData) {
         try {
             Instant now = Instant.now();
-            UzumProductChange uzumProductChange = UzumGQLProductResponseToMessageMapper.mapToProtobuf(productData);
+            UzumProductChange uzumProductChange = uzumProductToMessageMapper.mapToMessage(productData);
             UzumScrapperEvent scrapperEvent = UzumScrapperEvent.newBuilder()
                     .setEventId(UUID.randomUUID().toString())
                     .setScrapTime(Timestamp.newBuilder()
