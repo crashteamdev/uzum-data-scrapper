@@ -6,12 +6,15 @@ import dev.crashteam.uzum.scrapper.data.v1.UzumProductChange;
 import dev.crashteam.uzum.scrapper.data.v1.UzumSkuCharacteristic;
 import dev.crashteam.uzum.scrapper.data.v1.UzumValue;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumGQLProductResponse;
+import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.time.temporal.TemporalAdjusters.firstDayOfYear;
 
@@ -24,7 +27,16 @@ public class UzumGQLProductResponseToMessageMapper {
         // Mapping main fields
         productChangeBuilder.setProductId(String.valueOf(product.getId()));
         productChangeBuilder.setTitle(product.getTitle());
-        productChangeBuilder.setTotalAvailableAmount(product.getOrdersQuantity());
+        if (!CollectionUtils.isEmpty(product.getSkuList())) {
+            int totalAvailableAmount = product.getSkuList()
+                    .stream()
+                    .map(UzumGQLProductResponse.SkuList::getAvailableAmount)
+                    .mapToInt(Integer::valueOf)
+                    .sum();
+            productChangeBuilder.setTotalAvailableAmount(totalAvailableAmount);
+        } else {
+            productChangeBuilder.setTotalAvailableAmount(0L);
+        }
         productChangeBuilder.setOrders(product.getOrdersQuantity());
         productChangeBuilder.setReviewsAmount(product.getFeedbackQuantity());
         productChangeBuilder.setRating(product.getRating());
