@@ -47,7 +47,7 @@ public class UzumService {
             return retryTemplate.execute((RetryCallback<List<UzumCategory.Data>, Exception>) retryContext -> {
                 ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
                         .key("headers")
-                        .value(Map.of("Authorization", headerRequestService.getCachedToken(),
+                        .value(Map.of(
                                 "Accept-Language", "ru-RU")).build();
                 ProxyRequestParams.ContextValue market = ProxyRequestParams.ContextValue.builder()
                         .key("market")
@@ -71,7 +71,7 @@ public class UzumService {
     public UzumProduct getProduct(Long id) {
         ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
                 .key("headers")
-                .value(Map.of("Authorization", headerRequestService.getCachedToken(),
+                .value(Map.of(
                         "Accept-Language", "ru-RU",
                         "x-iid", "random_uuid()")).build();
         ProxyRequestParams.ContextValue market = ProxyRequestParams.ContextValue.builder()
