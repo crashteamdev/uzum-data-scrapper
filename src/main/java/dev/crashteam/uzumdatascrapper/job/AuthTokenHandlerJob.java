@@ -1,5 +1,6 @@
 package dev.crashteam.uzumdatascrapper.job;
 
+import com.auth0.jwt.interfaces.DecodedJWT;
 import dev.crashteam.uzumdatascrapper.model.ProxyRequestParams;
 import dev.crashteam.uzumdatascrapper.model.StyxProxyResult;
 import dev.crashteam.uzumdatascrapper.service.integration.StyxProxyService;
@@ -12,10 +13,15 @@ import org.springframework.http.*;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
+import com.auth0.jwt.JWT;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 
 @Slf4j
 @Component
@@ -39,12 +45,18 @@ public class AuthTokenHandlerJob {
 
     @Async
     @Scheduled(cron = "${app.job.cron.token-job}")
-    public void execute()  {
+    public void execute() {
         try {
             String authToken = redisTemplate.opsForValue().get(AUTH_TOKEN);
-            boolean isAuthTokenValid = checkAuthToken(authToken);
-            if (isAuthTokenValid) {
-                return;
+            if (StringUtils.hasText(authToken)) {
+                DecodedJWT decodedJWT = JWT.decode(authToken);
+                Long exp = decodedJWT.getClaims().get("exp").asLong();
+                LocalDateTime expiredTime =
+                        LocalDateTime.ofInstant(Instant.ofEpochSecond(exp),
+                                TimeZone.getDefault().toZoneId());
+                if (expiredTime.isAfter(LocalDateTime.now())) {
+                    return;
+                }
             }
             String newAuthToken = getAuthToken();
             log.info("Got new token - {}", newAuthToken);

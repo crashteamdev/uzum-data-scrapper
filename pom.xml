@@ -20,6 +20,7 @@
         <spring-retry.version>1.2.5.RELEASE</spring-retry.version>
         <spring-aspects.version>5.2.8.RELEASE</spring-aspects.version>
         <protobuf.version>3.21.12</protobuf.version>
+        <auth0.jwt.version>3.18.1</auth0.jwt.version>
     </properties>
     <dependencies>
         <dependency>
@@ -54,6 +55,13 @@
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-core</artifactId>
             <version>1.12.560</version>
+        </dependency>
+
+        <!-- JWT token handling -->
+        <dependency>
+            <groupId>com.auth0</groupId>
+            <artifactId>java-jwt</artifactId>
+            <version>${auth0.jwt.version}</version>
         </dependency>
 
         <!--database-->
