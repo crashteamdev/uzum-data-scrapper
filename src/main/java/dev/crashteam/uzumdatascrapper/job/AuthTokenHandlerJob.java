@@ -40,14 +40,20 @@ public class AuthTokenHandlerJob {
     @Async
     @Scheduled(cron = "${app.job.cron.token-job}")
     public void execute()  {
-        String authToken = redisTemplate.opsForValue().get(AUTH_TOKEN);
-        boolean isAuthTokenValid = checkAuthToken(authToken);
-        if (isAuthTokenValid) {
-            return;
+        try {
+            String authToken = redisTemplate.opsForValue().get(AUTH_TOKEN);
+            boolean isAuthTokenValid = checkAuthToken(authToken);
+            if (isAuthTokenValid) {
+                return;
+            }
+            String newAuthToken = getAuthToken();
+            log.info("Got new token - {}", newAuthToken);
+            redisTemplate.opsForValue().set(AUTH_TOKEN, newAuthToken);
+        } catch (Exception e) {
+            String newAuthToken = getAuthToken();
+            log.info("Got new token - {}, but exception acquired - {}", newAuthToken, e.getMessage());
+            redisTemplate.opsForValue().set(AUTH_TOKEN, newAuthToken);
         }
-        String newAuthToken = getAuthToken();
-        log.info("Got new token - {}", newAuthToken);
-        redisTemplate.opsForValue().set(AUTH_TOKEN, newAuthToken);
     }
 
     private String getAuthToken() {
