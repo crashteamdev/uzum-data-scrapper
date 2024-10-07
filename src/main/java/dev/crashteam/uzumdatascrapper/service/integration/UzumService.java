@@ -6,7 +6,6 @@ import dev.crashteam.uzumdatascrapper.model.ProxyRequestParams;
 import dev.crashteam.uzumdatascrapper.model.StyxProxyResult;
 import dev.crashteam.uzumdatascrapper.model.uzum.*;
 import dev.crashteam.uzumdatascrapper.service.integration.interceptor.AuthHeaderRequestService;
-import dev.crashteam.uzumdatascrapper.util.RandomUserAgent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,7 +17,6 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import javax.annotation.PostConstruct;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -253,19 +251,8 @@ public class UzumService {
     public Set<Long> getIdsByGql() {
         Set<Long> ids = getIds();
         Set<Long> categoryIds = new CopyOnWriteArraySet<>();
-        List<Callable<Void>> callables = new ArrayList<>();
         for (Long id : ids) {
-            callables.add(processGqlForIds(id, categoryIds));
-        }
-        List<Future<Void>> futures = callables.stream()
-                .map(taskExecutor::submit)
-                .toList();
-        for (Future<Void> future : futures) {
-            try {
-                future.get();
-            } catch (Exception e) {
-                log.error("Multithreading error", e);
-            }
+            processGqlForIds(id, categoryIds);
         }
         log.info("Collected {} ids from GQL requests", categoryIds.size());
         return categoryIds;
@@ -290,7 +277,7 @@ public class UzumService {
         });
     }
 
-    private Callable<Void> processGqlForIds(Long id, Set<Long> ids) {
+    private Callable<Void> processGqlForIdsAsync(Long id, Set<Long> ids) {
         return () -> {
             UzumGQLResponse gqlResponse = retryableGQLRequest(id, 0L, 0L);
             for (UzumGQLResponse.ResponseCategoryWrapper categoryWrapper : gqlResponse.getData().getMakeSearch().getCategoryTree()) {
@@ -298,6 +285,13 @@ public class UzumService {
             }
             return null;
         };
+    }
+
+    private void processGqlForIds(Long id, Set<Long> ids) {
+        UzumGQLResponse gqlResponse = retryableGQLRequest(id, 0L, 0L);
+        for (UzumGQLResponse.ResponseCategoryWrapper categoryWrapper : gqlResponse.getData().getMakeSearch().getCategoryTree()) {
+            ids.add(categoryWrapper.getCategory().getId());
+        }
     }
 
     private void extractIds(UzumCategory.Data data, Set<Long> ids) {
