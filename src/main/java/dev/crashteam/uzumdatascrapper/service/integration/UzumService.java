@@ -1,6 +1,7 @@
 package dev.crashteam.uzumdatascrapper.service.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.crashteam.uzumdatascrapper.exception.CategoryRequestException;
 import dev.crashteam.uzumdatascrapper.exception.UzumGqlRequestException;
 import dev.crashteam.uzumdatascrapper.model.ProxyRequestParams;
 import dev.crashteam.uzumdatascrapper.model.StyxProxyResult;
@@ -21,6 +22,7 @@ import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -277,16 +279,6 @@ public class UzumService {
         });
     }
 
-    private Callable<Void> processGqlForIdsAsync(Long id, Set<Long> ids) {
-        return () -> {
-            UzumGQLResponse gqlResponse = retryableGQLRequest(id, 0L, 0L);
-            for (UzumGQLResponse.ResponseCategoryWrapper categoryWrapper : gqlResponse.getData().getMakeSearch().getCategoryTree()) {
-                ids.add(categoryWrapper.getCategory().getId());
-            }
-            return null;
-        };
-    }
-
     private void processGqlForIds(Long id, Set<Long> ids) {
         UzumGQLResponse gqlResponse = retryableGQLRequest(id, 0L, 0L);
         for (UzumGQLResponse.ResponseCategoryWrapper categoryWrapper : gqlResponse.getData().getMakeSearch().getCategoryTree()) {
@@ -302,27 +294,9 @@ public class UzumService {
     }
 
 
-    private Callable<Void> extractIdsAsync(UzumCategory.Data data, Set<Long> ids, boolean all) {
-        return () -> {
-            if (all) {
-                extractAllIds(data, ids);
-            } else {
-                extractIds(data, ids);
-            }
-            return null;
-        };
-    }
-
     private Callable<Void> extractIdsAsync(UzumCategory.Data data, Set<Long> ids) {
         return () -> {
             extractIds(data, ids);
-            return null;
-        };
-    }
-
-    private Callable<Void> extractAllIdsAsync(UzumCategory.Data data, Set<Long> ids) {
-        return () -> {
-            extractAllIds(data, ids);
             return null;
         };
     }
@@ -332,5 +306,78 @@ public class UzumService {
         for (UzumCategory.Data child : data.getChildren()) {
             extractAllIds(child, ids);
         }
+    }
+
+    public Set<Long> getAllIds() {
+        Set<Long> ids = new HashSet<>();
+        List<UzumCategory.Data> rootCategories = retryTemplate.execute((RetryCallback<List<UzumCategory.Data>, CategoryRequestException>) retryContext -> {
+            var categoryData = getRootCategories();
+            if (categoryData == null) {
+                throw new CategoryRequestException();
+            }
+            return categoryData;
+        });
+        for (UzumCategory.Data rootCategory : rootCategories) {
+            ids.addAll(getIdsFromRoot(rootCategory));
+        }
+        UzumGQLResponse gqlResponse = retryableGQLRequest(1, 0, 0);
+        List<UzumGQLResponse.ResponseCategoryWrapper> categoryTree = gqlResponse.getData().getMakeSearch().getCategoryTree();
+        for (UzumCategory.Data rootCategory : rootCategories) {
+            addIdsFromTree(rootCategory, categoryTree, ids);
+        }
+        log.info("Got {} ids", ids.size());
+        return ids;
+    }
+
+    private Set<Long> getIdsFromRoot(UzumCategory.Data rootCategory) {
+        Set<Long> ids = new HashSet<>();
+        ids.add(rootCategory.getId());
+        for (UzumCategory.Data child : rootCategory.getChildren()) {
+            ids.addAll(getIdsFromRoot(child));
+        }
+        return ids;
+    }
+
+    private void addIdsFromTree(
+            UzumCategory.Data category,
+            List<UzumGQLResponse.ResponseCategoryWrapper> categoryTree,
+            Set<Long> ids) {
+        ids.add(category.getId());
+        if (!CollectionUtils.isEmpty(category.getChildren())) {
+            for (UzumCategory.Data child : category.getChildren()) {
+                addIdsFromTree(child, categoryTree, ids);
+            }
+        }
+        if (hasChildren(category.getId(), categoryTree)) {
+            Set<UzumGQLResponse.ResponseCategoryWrapper> responseCategories = categoryTree.stream()
+                    .filter(it -> it.getCategory().getParent() != null
+                            && Objects.equals(it.getCategory().getParent().getId(), category.getId()))
+                    .collect(Collectors.toSet());
+            for (UzumGQLResponse.ResponseCategoryWrapper responseCategory : responseCategories) {
+                addIdsFromChildrenCategory(responseCategory, categoryTree, ids);
+            }
+        }
+    }
+
+    private void addIdsFromChildrenCategory(
+            UzumGQLResponse.ResponseCategoryWrapper responseCategory,
+            List<UzumGQLResponse.ResponseCategoryWrapper> categoryTree,
+            Set<Long> ids) {
+        UzumGQLResponse.ResponseCategory childCategory = responseCategory.getCategory();
+        ids.add(childCategory.getId());
+        if (hasChildren(childCategory.getId(), categoryTree)) {
+            Set<UzumGQLResponse.ResponseCategoryWrapper> responseCategories = categoryTree.stream()
+                    .filter(it -> it.getCategory().getParent() != null
+                            && Objects.equals(it.getCategory().getParent().getId(), childCategory.getId()))
+                    .collect(Collectors.toSet());
+            for (UzumGQLResponse.ResponseCategoryWrapper category : responseCategories) {
+                addIdsFromChildrenCategory(category, categoryTree, ids);
+            }
+        }
+    }
+
+    private boolean hasChildren(Long categoryId, List<UzumGQLResponse.ResponseCategoryWrapper> categoryTree) {
+        return categoryTree.stream().anyMatch(it -> it.getCategory().getParent() != null
+                && Objects.equals(it.getCategory().getParent().getId(), categoryId));
     }
 }

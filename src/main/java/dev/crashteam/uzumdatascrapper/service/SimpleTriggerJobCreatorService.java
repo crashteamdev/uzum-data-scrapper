@@ -25,7 +25,7 @@ public class SimpleTriggerJobCreatorService {
         if (!allIds) {
             ids = uzumService.getIds();
         } else {
-            ids = uzumService.getIdsByGql();
+            ids = uzumService.getAllIds();
         }
         for (Long categoryId : ids) {
             String name = jobName.formatted(categoryId);
