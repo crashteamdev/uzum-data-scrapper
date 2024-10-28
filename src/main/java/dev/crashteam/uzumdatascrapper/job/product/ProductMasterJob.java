@@ -1,6 +1,7 @@
 package dev.crashteam.uzumdatascrapper.job.product;
 
 import dev.crashteam.uzumdatascrapper.model.Constant;
+import dev.crashteam.uzumdatascrapper.service.ProductDataService;
 import dev.crashteam.uzumdatascrapper.service.SimpleTriggerJobCreatorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,9 +16,11 @@ import org.springframework.stereotype.Service;
 public class ProductMasterJob implements Job {
 
     private final SimpleTriggerJobCreatorService creatorService;
+    private final ProductDataService productDataService;
 
     @Override
     public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
+        productDataService.delete();
         creatorService.createJob(Constant.PRODUCT_JOB_NAME, Constant.CATEGORY_ID_KEY, ProductJob.class, false);
     }
 }

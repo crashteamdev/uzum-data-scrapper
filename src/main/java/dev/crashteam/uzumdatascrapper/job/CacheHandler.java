@@ -19,6 +19,5 @@ public class CacheHandler implements Job {
 
     @Override
     public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
-        productDataService.delete();
     }
 }
