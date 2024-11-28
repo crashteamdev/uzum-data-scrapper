@@ -63,9 +63,6 @@ app:
       maxlen: 50000
       waitPending: 0
   integration:
-    proxy:
-      login: login
-      password: password
     timeout:
       from: 3500
       to: 5000
