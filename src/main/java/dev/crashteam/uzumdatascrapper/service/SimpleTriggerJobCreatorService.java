@@ -1,14 +1,19 @@
 package dev.crashteam.uzumdatascrapper.service;
 
+import dev.crashteam.uzumdatascrapper.model.uzum.UzumCategory;
 import dev.crashteam.uzumdatascrapper.service.integration.UzumService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.*;
 import org.springframework.scheduling.quartz.SimpleTriggerFactoryBean;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.quartz.SimpleTrigger.MISFIRE_INSTRUCTION_FIRE_NOW;
 
@@ -22,10 +27,12 @@ public class SimpleTriggerJobCreatorService {
 
     public void createJob(String jobName, String idKey, Class<? extends Job> jobClass, boolean allIds) {
         Set<Long> ids;
+        List<Long> rootIds = Collections.emptyList();
         if (!allIds) {
             ids = uzumService.getIds();
         } else {
             ids = uzumService.getAllIds();
+            rootIds = uzumService.getRootCategories().stream().map(UzumCategory.Data::getId).toList();
         }
         for (Long categoryId : ids) {
             String name = jobName.formatted(categoryId);
@@ -42,6 +49,10 @@ public class SimpleTriggerJobCreatorService {
             factoryBean.setName(name);
             factoryBean.setMisfireInstruction(MISFIRE_INSTRUCTION_FIRE_NOW);
             factoryBean.afterPropertiesSet();
+            if (!CollectionUtils.isEmpty(rootIds)
+                    && rootIds.stream().anyMatch(it -> it.equals(categoryId))) {
+                factoryBean.setPriority(10);
+            }
 
             try {
                 boolean exists = scheduler.checkExists(jobKey);
