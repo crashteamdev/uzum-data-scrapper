@@ -150,6 +150,19 @@ public class UzumService {
         }).getBody();
     }
 
+    public Map<Long, Set<Long>> getRootIdsMap() {
+        log.info("Collecting root category map");
+        Map<Long, Set<Long>> rootCategoriesMap = new HashMap<>();
+        List<UzumCategory.Data> categories = getRootCategories();
+        for (UzumCategory.Data category : categories) {
+            rootCategoriesMap.put(category.getId(), new HashSet<>());
+            for (UzumCategory.Data child : category.getChildren()) {
+                rootCategoriesMap.get(category.getId()).add(child.getId());
+            }
+        }
+        return rootCategoriesMap;
+    }
+
     public UzumCategoryChild getCategoryData(Long id) {
         ProxyRequestParams.ContextValue headers = ProxyRequestParams.ContextValue.builder()
                 .key("headers")

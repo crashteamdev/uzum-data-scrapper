@@ -2,6 +2,7 @@ package dev.crashteam.uzumdatascrapper.model;
 
 public class Constant {
 
+    public static final String PRODUCT_CATEGORY_MAP_KEY = "productCategoryMap";
     public static final String CATEGORY_ID_KEY = "categoryId";
     public static final String POSITION_CATEGORY_KEY = "positionCategoryId";
     public static final String PRODUCT_MASTER_JOB_TRIGGER = "product_master_trigger";

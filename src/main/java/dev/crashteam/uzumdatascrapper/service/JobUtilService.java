@@ -86,6 +86,28 @@ public class JobUtilService {
         });
     }
 
+    public UzumGQLResponse getResponse(AtomicLong offset, Long categoryId, Long limit) {
+        return retryTemplate.execute((RetryCallback<UzumGQLResponse, UzumGqlRequestException>) retryContext -> {
+            UzumGQLResponse response = uzumService.getGQLSearchResponse(String.valueOf(categoryId), offset.get(), limit);
+            if (!CollectionUtils.isEmpty(response.getErrors())) {
+                for (UzumGQLResponse.GQLError error : response.getErrors()) {
+                    if (error.getMessage().contains("offset")) {
+                        log.warn("Finished collecting data for id - {}, " +
+                                "because of response error object with message - {}", categoryId, error.getMessage());
+                        return null;
+                    } else if (error.getMessage().contains("429")) {
+                        log.warn("Got 429 http status from request for category id {}", categoryId);
+                        throw new UzumGqlRequestException("Request ended with error message - %s".formatted(error.getMessage()));
+                    } else {
+                        offset.addAndGet(limit);
+                        throw new UzumGqlRequestException("Request ended with error message - %s".formatted(error.getMessage()));
+                    }
+                }
+            }
+            return response;
+        });
+    }
+
     @Cacheable(value = "uzumProductCache")
     public CachedProductData getCachedProductData(Long itemId) {
         return UzumProductToCachedProduct.toCachedData(getProductData(itemId));

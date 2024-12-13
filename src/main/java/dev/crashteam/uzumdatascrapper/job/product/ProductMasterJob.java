@@ -21,7 +21,7 @@ public class ProductMasterJob implements Job {
     @Override
     public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
         productDataService.delete();
-        creatorService.createJob(Constant.PRODUCT_JOB_NAME, Constant.CATEGORY_ID_KEY, ProductJob.class, false);
+        creatorService.createLightJob(Constant.PRODUCT_JOB_NAME, Constant.CATEGORY_ID_KEY, Constant.PRODUCT_CATEGORY_MAP_KEY, ProductJob.class);
     }
 }
 

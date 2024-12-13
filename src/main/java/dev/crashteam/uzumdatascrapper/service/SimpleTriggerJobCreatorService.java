@@ -1,5 +1,6 @@
 package dev.crashteam.uzumdatascrapper.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.crashteam.uzumdatascrapper.model.uzum.UzumCategory;
 import dev.crashteam.uzumdatascrapper.service.integration.UzumService;
 import lombok.RequiredArgsConstructor;
@@ -9,10 +10,7 @@ import org.springframework.scheduling.quartz.SimpleTriggerFactoryBean;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.quartz.SimpleTrigger.MISFIRE_INSTRUCTION_FIRE_NOW;
@@ -64,6 +62,46 @@ public class SimpleTriggerJobCreatorService {
                 log.error("Failed to start job with exception ", e);
             }
         }
+    }
+
+    public void createLightJob(String jobName, String idKey, String categoryMapKey, Class<? extends Job> jobClass) {
+
+        Map<Long, Set<Long>> rootIdsMap = uzumService.getRootIdsMap();
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        rootIdsMap.forEach((categoryId, children) -> {
+            String name = jobName.formatted(categoryId);
+            JobKey jobKey = new JobKey(name);
+            JobDetail jobDetail = JobBuilder.newJob(jobClass)
+                    .withIdentity(jobKey).build();
+            jobDetail.getJobDataMap().put(idKey, String.valueOf(categoryId));
+            try {
+                jobDetail.getJobDataMap().put(categoryMapKey, objectMapper.writeValueAsString(rootIdsMap));
+            } catch (Exception e) {
+                log.info("Map serializing exception for job with categoryId - {}", categoryId);
+            }
+
+            SimpleTriggerFactoryBean factoryBean = new SimpleTriggerFactoryBean();
+            factoryBean.setStartTime(new Date());
+            factoryBean.setStartDelay(0L);
+            factoryBean.setRepeatInterval(10000L);
+            factoryBean.setRepeatCount(0);
+            factoryBean.setName(name);
+            factoryBean.setMisfireInstruction(MISFIRE_INSTRUCTION_FIRE_NOW);
+            factoryBean.afterPropertiesSet();
+
+            try {
+                boolean exists = scheduler.checkExists(jobKey);
+                if (!exists) {
+                    scheduler.scheduleJob(jobDetail, factoryBean.getObject());
+                }
+            } catch (SchedulerException e) {
+                log.warn("Scheduler exception occurred with message: {}", e.getMessage());
+            } catch (Exception e) {
+                log.error("Failed to start job with exception ", e);
+            }
+        });
+
     }
 
 }
